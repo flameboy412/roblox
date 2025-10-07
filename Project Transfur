@@ -1,9 +1,10 @@
 -- Cyberpunk Finder GUI (LocalScript)
--- Updates:
+-- Additions:
+--  - Horizontal scrolling tab bar
+--  - New "Theme" tab with RGB/HSV color picker
+--  - Theme manager updates accents across the whole UI in real-time
+--  - Existing tabs: Items, Ammo, Interactables, Loot (with keyword search)
 --  - Toggle key: K
---  - Keyword search: AND across words, OR within a word using "|" or "," (e.g., "red|blue chest")
---  - New tab: Loot (all Model descendants under workspace.Environment.WorldModelSpawns.LootSpawnPoints)
---  - Each tab re-scans on click and filters live as you type
 
 local Players = game:GetService("Players")
 local UIS = game:GetService("UserInputService")
@@ -16,16 +17,65 @@ local pg = player:WaitForChild("PlayerGui")
 local existing = pg:FindFirstChild("CyberFinderGui")
 if existing then existing:Destroy() end
 
--- THEME
+-- THEME (base)
 local Colors = {
 	bg = Color3.fromRGB(9,12,20),
 	panel = Color3.fromRGB(18,22,36),
 	panelDark = Color3.fromRGB(14,18,30),
-	accent = Color3.fromRGB(0,255,170),      -- neon cyan
-	accent2 = Color3.fromRGB(255,210,0),     -- neon yellow
+	accent = Color3.fromRGB(0,255,170),      -- primary neon
+	accent2 = Color3.fromRGB(255,210,0),     -- secondary neon
 	text = Color3.fromRGB(230, 255, 255),
 	textDim = Color3.fromRGB(160, 195, 195),
 }
+local DefaultColors = {}
+for k,v in pairs(Colors) do DefaultColors[k] = v end
+
+-- Theme manager: gather elements to recolor dynamically
+local Theme = {
+	refs = {
+		strokes = {},
+		scrollbars = {},
+		underlines = {},
+		accentTexts = {},
+		accentFrames = {},
+	},
+}
+function Theme.registerStroke(stroke) table.insert(Theme.refs.strokes, stroke) end
+function Theme.registerScrollbar(sf) table.insert(Theme.refs.scrollbars, sf) end
+function Theme.registerUnderline(frame) table.insert(Theme.refs.underlines, frame) end
+function Theme.registerAccentText(lbl) table.insert(Theme.refs.accentTexts, lbl) end
+function Theme.registerAccentFrame(fr) table.insert(Theme.refs.accentFrames, fr) end
+
+function Theme.apply()
+	for _, s in ipairs(Theme.refs.strokes) do
+		if s and s.Parent then s.Color = Colors.accent end
+	end
+	for _, sf in ipairs(Theme.refs.scrollbars) do
+		if sf and sf.Parent then sf.ScrollBarImageColor3 = Colors.accent2 end
+	end
+	for _, ul in ipairs(Theme.refs.underlines) do
+		if ul and ul.Parent then ul.BackgroundColor3 = Colors.accent2 end
+	end
+	for _, t in ipairs(Theme.refs.accentTexts) do
+		if t and t.Parent then t.TextColor3 = Colors.accent2 end
+	end
+	for _, f in ipairs(Theme.refs.accentFrames) do
+		if f and f.Parent then f.BackgroundColor3 = Colors.accent2 end
+	end
+end
+
+function Theme.setPrimary(color)
+	-- One picker controls both neon accents by default
+	Colors.accent = color
+	Colors.accent2 = color
+	Theme.apply()
+end
+
+function Theme.reset()
+	Colors.accent = DefaultColors.accent
+	Colors.accent2 = DefaultColors.accent2
+	Theme.apply()
+end
 
 -- Helpers
 local function make(instance, props, children)
@@ -35,14 +85,16 @@ local function make(instance, props, children)
 end
 
 local function neonStroke(parent, color, thickness)
-	return make(Instance.new("UIStroke"), {
-		Color = color,
+	local s = make(Instance.new("UIStroke"), {
+		Color = color or Colors.accent,
 		Thickness = thickness or 2,
 		Transparency = 0.15,
 		ApplyStrokeMode = Enum.ApplyStrokeMode.Border,
 		LineJoinMode = Enum.LineJoinMode.Round,
 		Parent = parent
 	})
+	Theme.registerStroke(s)
+	return s
 end
 
 local function corner(parent, r)
@@ -59,7 +111,7 @@ local function vPadding(parent, px)
 	return pad
 end
 
-local function autoScroll(scroller)
+local function autoScrollY(scroller)
 	local layout = Instance.new("UIListLayout")
 	layout.Padding = UDim.new(0, 6)
 	layout.SortOrder = Enum.SortOrder.LayoutOrder
@@ -72,7 +124,15 @@ local function autoScroll(scroller)
 	return layout
 end
 
--- Build a searchable string from an instance (name + a few ancestors + class)
+local function autoScrollX(scroller, layout)
+	local function update()
+		scroller.CanvasSize = UDim2.new(0, layout.AbsoluteContentSize.X + 10, 0, 0)
+	end
+	layout:GetPropertyChangedSignal("AbsoluteContentSize"):Connect(update)
+	update()
+end
+
+-- Keyword search utils
 local function buildSearchString(instance)
 	local parts = {}
 	table.insert(parts, instance.Name)
@@ -86,14 +146,10 @@ local function buildSearchString(instance)
 	end
 	return string.lower(table.concat(parts, " "))
 end
-
--- Parse query into AND groups of OR alternatives
--- "red|blue chest" -> {{"red","blue"}, {"chest"}}
 local function parseKeywordGroups(query)
 	local groups = {}
 	if not query or query == "" then return groups end
 	query = string.lower(query)
-	-- Keep | and , as OR delimiters; keep - and _ inside tokens; other punctuation -> space
 	query = query:gsub("[^%w%|%,%-%_%s]", " ")
 	for token in string.gmatch(query, "%S+") do
 		local alts = {}
@@ -104,7 +160,6 @@ local function parseKeywordGroups(query)
 	end
 	return groups
 end
-
 local function matchesKeywords(instance, query)
 	local groups = parseKeywordGroups(query)
 	if #groups == 0 then return true end
@@ -112,10 +167,7 @@ local function matchesKeywords(instance, query)
 	for _, alts in ipairs(groups) do
 		local found = false
 		for _, alt in ipairs(alts) do
-			if string.find(text, alt, 1, true) then
-				found = true
-				break
-			end
+			if string.find(text, alt, 1, true) then found = true break end
 		end
 		if not found then return false end
 	end
@@ -137,7 +189,6 @@ local function teleportTo(target)
 	else
 		return
 	end
-
 	local offset = Vector3.new(0, 4, 0)
 	hrp.CFrame = CFrame.new((cf.Position + offset), cf.Position + cf.LookVector * 10)
 end
@@ -165,12 +216,13 @@ local main = make(Instance.new("Frame"), {
 corner(main, 10); neonStroke(main, Colors.accent, 2)
 
 -- Accent rim
-make(Instance.new("Frame"), {
+local rimTop = make(Instance.new("Frame"), {
 	Size = UDim2.new(1, 0, 0, 3),
 	BackgroundColor3 = Colors.accent2,
 	BackgroundTransparency = 0.2,
 	Parent = main
 })
+Theme.registerAccentFrame(rimTop)
 
 -- Title bar
 local titleBar = make(Instance.new("Frame"), {
@@ -207,21 +259,29 @@ make(Instance.new("TextLabel"), {
 	Parent = titleBar
 })
 
--- Tab bar
-local tabBar = make(Instance.new("Frame"), {
+-- Tab bar (horizontal scroller)
+local tabBar = make(Instance.new("ScrollingFrame"), {
 	Name = "TabBar",
-	Size = UDim2.new(1, -16, 0, 38),
+	Size = UDim2.new(1, -16, 0, 42),
 	Position = UDim2.new(0, 8, 0, 38),
 	BackgroundColor3 = Colors.panelDark,
 	BorderSizePixel = 0,
+	ScrollBarThickness = 6,
+	ScrollingDirection = Enum.ScrollingDirection.X,
+	BottomImage = "rbxassetid://0", -- hide default arrows
+	MidImage = "rbxassetid://0",
+	TopImage = "rbxassetid://0",
 	Parent = main
 })
 corner(tabBar, 8); neonStroke(tabBar, Colors.accent, 1)
 vPadding(tabBar, 4)
+Theme.registerScrollbar(tabBar)
+
 local tabLayout = Instance.new("UIListLayout")
 tabLayout.FillDirection = Enum.FillDirection.Horizontal
 tabLayout.Padding = UDim.new(0, 6)
 tabLayout.Parent = tabBar
+autoScrollX(tabBar, tabLayout)
 
 local function makeTabButton(text)
 	local btn = Instance.new("TextButton")
@@ -246,6 +306,7 @@ local function makeTabButton(text)
 	underline.BackgroundTransparency = 0.5
 	underline.Visible = false
 	underline.Parent = btn
+	Theme.registerUnderline(underline)
 
 	return btn
 end
@@ -254,11 +315,12 @@ local itemsTab = makeTabButton("Items")
 local ammoTab = makeTabButton("Ammo")
 local interactTab = makeTabButton("Interactables")
 local lootTab = makeTabButton("Loot")
+local themeTab = makeTabButton("Theme")
 
 -- Content region
 local content = make(Instance.new("Frame"), {
 	Name = "Content",
-	Size = UDim2.new(1, -16, 1, -38 - 46 - 16),
+	Size = UDim2.new(1, -16, 1, -42 - 46 - 16),
 	Position = UDim2.new(0, 8, 0, 38 + 46),
 	BackgroundColor3 = Colors.panelDark,
 	BorderSizePixel = 0,
@@ -292,6 +354,7 @@ local function makeSearchPage(placeholderText)
 	searchIcon.TextColor3 = Colors.accent2
 	searchIcon.TextScaled = true
 	searchIcon.Parent = searchFrame
+	Theme.registerAccentText(searchIcon)
 
 	local searchBox = Instance.new("TextBox")
 	searchBox.Name = "SearchBox"
@@ -334,7 +397,8 @@ local function makeSearchPage(placeholderText)
 	scroll.ScrollBarImageColor3 = Colors.accent2
 	scroll.Parent = page
 	corner(scroll, 8); neonStroke(scroll, Colors.accent, 1)
-	autoScroll(scroll)
+	Theme.registerScrollbar(scroll)
+	autoScrollY(scroll)
 
 	return page, scroll, searchBox
 end
@@ -343,6 +407,290 @@ local itemsPage, itemsScroll, itemsSearch = makeSearchPage("Keywords: e.g. crate
 local ammoPage, ammoScroll, ammoSearch = makeSearchPage("Keywords: e.g. shell 9mm")
 local interactPage, interactScroll, interactSearch = makeSearchPage("Search Interactables...")
 local lootPage, lootScroll, lootSearch = makeSearchPage("Search Loot...")
+
+-- Theme tab page (RGB/HSV color picker)
+local themePage = Instance.new("Frame")
+themePage.BackgroundTransparency = 1
+themePage.Size = UDim2.new(1, 0, 1, 0)
+themePage.Visible = false
+themePage.Parent = content
+
+do
+	-- Layout container
+	local pane = Instance.new("Frame")
+	pane.Size = UDim2.new(1, 0, 1, 0)
+	pane.BackgroundTransparency = 1
+	pane.Parent = themePage
+
+	-- Preview + reset
+	local preview = Instance.new("Frame")
+	preview.Size = UDim2.new(0, 64, 0, 64)
+	preview.Position = UDim2.new(1, -72, 0, 0)
+	preview.BackgroundColor3 = Colors.accent
+	preview.BorderSizePixel = 0
+	preview.Parent = pane
+	corner(preview, 8); neonStroke(preview, Colors.accent, 1)
+
+	local resetBtn = Instance.new("TextButton")
+	resetBtn.Size = UDim2.new(0, 80, 0, 28)
+	resetBtn.Position = UDim2.new(1, -88, 0, 72)
+	resetBtn.BackgroundColor3 = Colors.panel
+	resetBtn.Text = "Reset"
+	resetBtn.TextColor3 = Colors.text
+	resetBtn.Font = Enum.Font.GothamSemibold
+	resetBtn.TextSize = 14
+	resetBtn.AutoButtonColor = false
+	resetBtn.Parent = pane
+	corner(resetBtn, 6); neonStroke(resetBtn, Colors.accent, 1)
+
+	-- HSV controls
+	local picker = Instance.new("Frame")
+	picker.Size = UDim2.new(0, 260, 0, 180)
+	picker.Position = UDim2.new(0, 8, 0, 0)
+	picker.BackgroundTransparency = 1
+	picker.Parent = pane
+
+	-- SV box
+	local svBox = Instance.new("Frame")
+	svBox.Size = UDim2.new(0, 220, 0, 160)
+	svBox.BackgroundColor3 = Color3.fromRGB(255, 0, 0)
+	svBox.BorderSizePixel = 0
+	svBox.Parent = picker
+	corner(svBox, 6); neonStroke(svBox, Colors.accent, 1)
+
+	-- White gradient (left->right)
+	local g1 = Instance.new("Frame")
+	g1.Size = UDim2.new(1, 0, 1, 0)
+	g1.BackgroundTransparency = 1
+	g1.Parent = svBox
+	local grad1 = Instance.new("UIGradient")
+	grad1.Color = ColorSequence.new{
+		ColorSequenceKeypoint.new(0, Color3.fromRGB(255,255,255)),
+		ColorSequenceKeypoint.new(1, Color3.fromRGB(255,255,255))
+	}
+	grad1.Transparency = NumberSequence.new{
+		NumberSequenceKeypoint.new(0, 0),
+		NumberSequenceKeypoint.new(1, 1)
+	}
+	grad1.Rotation = 0
+	grad1.Parent = g1
+
+	-- Black gradient (top->bottom)
+	local g2 = Instance.new("Frame")
+	g2.Size = UDim2.new(1, 0, 1, 0)
+	g2.BackgroundTransparency = 1
+	g2.Parent = svBox
+	local grad2 = Instance.new("UIGradient")
+	grad2.Color = ColorSequence.new{
+		ColorSequenceKeypoint.new(0, Color3.fromRGB(0,0,0)),
+		ColorSequenceKeypoint.new(1, Color3.fromRGB(0,0,0))
+	}
+	grad2.Transparency = NumberSequence.new{
+		NumberSequenceKeypoint.new(0, 1),
+		NumberSequenceKeypoint.new(1, 0)
+	}
+	grad2.Rotation = 90
+	grad2.Parent = g2
+
+	-- SV marker
+	local svMarker = Instance.new("Frame")
+	svMarker.Size = UDim2.new(0, 8, 0, 8)
+	svMarker.AnchorPoint = Vector2.new(0.5, 0.5)
+	svMarker.Position = UDim2.new(0, 0, 0, 0)
+	svMarker.BackgroundColor3 = Colors.text
+	svMarker.BorderSizePixel = 0
+	svMarker.Parent = svBox
+	corner(svMarker, 100)
+
+	-- Hue bar
+	local hueBar = Instance.new("Frame")
+	hueBar.Size = UDim2.new(0, 20, 0, 160)
+	hueBar.Position = UDim2.new(0, 230, 0, 0)
+	hueBar.BorderSizePixel = 0
+	hueBar.Parent = picker
+	corner(hueBar, 6); neonStroke(hueBar, Colors.accent, 1)
+
+	local hg = Instance.new("UIGradient")
+	hg.Color = ColorSequence.new({
+		ColorSequenceKeypoint.new(0/6, Color3.fromRGB(255,0,0)),
+		ColorSequenceKeypoint.new(1/6, Color3.fromRGB(255,255,0)),
+		ColorSequenceKeypoint.new(2/6, Color3.fromRGB(0,255,0)),
+		ColorSequenceKeypoint.new(3/6, Color3.fromRGB(0,255,255)),
+		ColorSequenceKeypoint.new(4/6, Color3.fromRGB(0,0,255)),
+		ColorSequenceKeypoint.new(5/6, Color3.fromRGB(255,0,255)),
+		ColorSequenceKeypoint.new(1,    Color3.fromRGB(255,0,0)),
+	})
+	hg.Rotation = 90
+	hg.Parent = hueBar
+
+	local hueMarker = Instance.new("Frame")
+	hueMarker.Size = UDim2.new(1, 0, 0, 2)
+	hueMarker.AnchorPoint = Vector2.new(0.5, 0.5)
+	hueMarker.Position = UDim2.new(0.5, 0, 0, 0)
+	hueMarker.BackgroundColor3 = Colors.text
+	hueMarker.BorderSizePixel = 0
+	hueMarker.Parent = hueBar
+
+	-- RGB input row
+	local rgbRow = Instance.new("Frame")
+	rgbRow.Size = UDim2.new(0, 260, 0, 36)
+	rgbRow.Position = UDim2.new(0, 8, 0, 180)
+	rgbRow.BackgroundTransparency = 1
+	rgbRow.Parent = themePage
+
+	local function makeRGBBox(lblText, offsetX)
+		local holder = Instance.new("Frame")
+		holder.Size = UDim2.new(0, 80, 1, 0)
+		holder.Position = UDim2.new(0, offsetX, 0, 0)
+		holder.BackgroundColor3 = Colors.panel
+		holder.BorderSizePixel = 0
+		holder.Parent = rgbRow
+		corner(holder, 6); neonStroke(holder, Colors.accent, 1)
+
+		local lbl = Instance.new("TextLabel")
+		lbl.Size = UDim2.new(0, 24, 1, 0)
+		lbl.BackgroundTransparency = 1
+		lbl.Text = lblText
+		lbl.TextColor3 = Colors.textDim
+		lbl.Font = Enum.Font.GothamBold
+		lbl.TextSize = 14
+		lbl.Parent = holder
+
+		local box = Instance.new("TextBox")
+		box.Size = UDim2.new(1, -26, 1, 0)
+		box.Position = UDim2.new(0, 26, 0, 0)
+		box.BackgroundTransparency = 1
+		box.ClearTextOnFocus = false
+		box.Text = "0"
+		box.TextColor3 = Colors.text
+		box.Font = Enum.Font.GothamSemibold
+		box.TextSize = 14
+		box.Parent = holder
+
+		return box
+	end
+
+	local rBox = makeRGBBox("R", 0)
+	local gBox = makeRGBBox("G", 90)
+	local bBox = makeRGBBox("B", 180)
+
+	-- HSV state
+	local h, s, v = Color3.toHSV(Colors.accent)
+	local function setSVFromColor(c3)
+		h, s, v = Color3.toHSV(c3)
+	end
+
+	-- Update UI visuals from HSV
+	local function refreshUI()
+		-- base hue for SV box
+		local hueColor = Color3.fromHSV(h, 1, 1)
+		svBox.BackgroundColor3 = hueColor
+		-- markers
+		if svBox.AbsoluteSize.X > 0 and svBox.AbsoluteSize.Y > 0 then
+			local x = s * svBox.AbsoluteSize.X
+			local y = (1 - v) * svBox.AbsoluteSize.Y
+			svMarker.Position = UDim2.new(0, x, 0, y)
+		end
+		if hueBar.AbsoluteSize.Y > 0 then
+			local y = h * hueBar.AbsoluteSize.Y
+			hueMarker.Position = UDim2.new(0.5, 0, 0, y)
+		end
+		-- update preview + numeric fields
+		local c = Color3.fromHSV(h, s, v)
+		preview.BackgroundColor3 = c
+		local rr = math.floor(c.R * 255 + 0.5)
+		local gg = math.floor(c.G * 255 + 0.5)
+		local bb = math.floor(c.B * 255 + 0.5)
+		rBox.Text, gBox.Text, bBox.Text = tostring(rr), tostring(gg), tostring(bb)
+	end
+
+	-- Apply current HSV to theme
+	local function applyTheme()
+		local c = Color3.fromHSV(h, s, v)
+		Theme.setPrimary(c)
+		-- Also update preview stroke to match
+		for _, child in ipairs(preview:GetChildren()) do
+			if child:IsA("UIStroke") then child.Color = Colors.accent end
+		end
+	end
+
+	-- Drag helpers
+	local draggingSV = false
+	local draggingH = false
+
+	local function updateSVFromInput(pos)
+		local absPos = svBox.AbsolutePosition
+		local absSize = svBox.AbsoluteSize
+		local relX = math.clamp((pos.X - absPos.X) / math.max(absSize.X,1), 0, 1)
+		local relY = math.clamp((pos.Y - absPos.Y) / math.max(absSize.Y,1), 0, 1)
+		s = relX
+		v = 1 - relY
+		refreshUI()
+		applyTheme()
+	end
+
+	local function updateHFromInput(pos)
+		local absPos = hueBar.AbsolutePosition
+		local absSize = hueBar.AbsoluteSize
+		local relY = math.clamp((pos.Y - absPos.Y) / math.max(absSize.Y,1), 0, 1)
+		h = relY
+		refreshUI()
+		applyTheme()
+	end
+
+	svBox.InputBegan:Connect(function(input)
+		if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+			draggingSV = true
+			updateSVFromInput(input.Position)
+			input.Changed:Connect(function()
+				if input.UserInputState == Enum.UserInputState.End then draggingSV = false end
+			end)
+		end
+	end)
+	hueBar.InputBegan:Connect(function(input)
+		if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+			draggingH = true
+			updateHFromInput(input.Position)
+			input.Changed:Connect(function()
+				if input.UserInputState == Enum.UserInputState.End then draggingH = false end
+			end)
+		end
+	end)
+	UIS.InputChanged:Connect(function(input)
+		if input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch then
+			if draggingSV then updateSVFromInput(input.Position) end
+			if draggingH then updateHFromInput(input.Position) end
+		end
+	end)
+
+	-- RGB boxes -> update HSV and theme
+	local function clamp255(n)
+		n = tonumber(n) or 0
+		return math.clamp(math.floor(n + 0.5), 0, 255)
+	end
+	local function rgbBoxesToTheme()
+		local r = clamp255(rBox.Text)
+		local g = clamp255(gBox.Text)
+		local b = clamp255(bBox.Text)
+		local c = Color3.fromRGB(r, g, b)
+		setSVFromColor(c)
+		refreshUI()
+		applyTheme()
+	end
+	rBox.FocusLost:Connect(rgbBoxesToTheme)
+	gBox.FocusLost:Connect(rgbBoxesToTheme)
+	bBox.FocusLost:Connect(rgbBoxesToTheme)
+
+	resetBtn.MouseButton1Click:Connect(function()
+		local c = DefaultColors.accent
+		setSVFromColor(c)
+		refreshUI()
+		Theme.reset()
+	end)
+
+	-- Initial sync
+	refreshUI()
+end
 
 -- List item factory
 local function makeListButton(parent, labelText, targetRef)
@@ -394,7 +742,6 @@ local function populateItems(query)
 	clearList(itemsScroll)
 	for _, child in ipairs(workspace:GetChildren()) do
 		if child:IsA("Model") and child.Parent == workspace then
-			-- Ignore player characters
 			if not child:FindFirstChildOfClass("Humanoid") then
 				if matchesKeywords(child, query) then
 					makeListButton(itemsScroll, child.Name, child)
@@ -461,13 +808,8 @@ local pages = {
 	Items = itemsPage,
 	Ammo = ammoPage,
 	Interactables = interactPage,
-	Loot = lootPage
-}
-local scrolls = {
-	Items = itemsScroll,
-	Ammo = ammoScroll,
-	Interactables = interactScroll,
-	Loot = lootScroll
+	Loot = lootPage,
+	Theme = themePage
 }
 local searches = {
 	Items = itemsSearch,
@@ -485,26 +827,24 @@ local tabButtons = {
 	Items = itemsTab,
 	Ammo = ammoTab,
 	Interactables = interactTab,
-	Loot = lootTab
+	Loot = lootTab,
+	Theme = themeTab
 }
 
 local currentTab = nil
-
 local function showTab(name)
-	local query = ""
-	local s = searches[name]
-	if s then query = s.Text or "" end
-
+	-- Repopulate data tabs with current search query
 	local populate = populators[name]
 	if populate then
-		local ok, err = pcall(function() populate(query) end)
+		local s = searches[name]
+		local q = s and s.Text or ""
+		local ok, err = pcall(function() populate(q) end)
 		if not ok then warn("[CyberScanner] Populate error for "..name..": "..tostring(err)) end
 	end
 
 	for tabName, page in pairs(pages) do
 		page.Visible = (tabName == name)
 	end
-
 	for tabName, btn in pairs(tabButtons) do
 		btn.TextColor3 = (tabName == name) and Colors.text or Colors.textDim
 		local ul = btn:FindFirstChild("Underline")
@@ -514,11 +854,11 @@ local function showTab(name)
 	currentTab = name
 end
 
--- Wire tab buttons
 itemsTab.MouseButton1Click:Connect(function() showTab("Items") end)
 ammoTab.MouseButton1Click:Connect(function() showTab("Ammo") end)
 interactTab.MouseButton1Click:Connect(function() showTab("Interactables") end)
 lootTab.MouseButton1Click:Connect(function() showTab("Loot") end)
+themeTab.MouseButton1Click:Connect(function() showTab("Theme") end)
 
 -- Live search wiring per tab
 local function wireSearch(tabName)
@@ -531,10 +871,7 @@ local function wireSearch(tabName)
 		end
 	end)
 end
-
-for name, _ in pairs(searches) do
-	wireSearch(name)
-end
+for name,_ in pairs(searches) do wireSearch(name) end
 
 -- Default open tab
 showTab("Items")
@@ -578,6 +915,9 @@ UIS.InputBegan:Connect(function(input, gpe)
 		setOpen(not isOpen)
 	end
 end)
+
+-- Initial theme application (ensures registered elements get colored)
+Theme.apply()
 
 -- Fade in on spawn
 main.Visible = false
