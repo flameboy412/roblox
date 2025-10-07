@@ -1,8 +1,9 @@
 -- Cyberpunk Finder GUI (LocalScript)
--- Changes:
---  - Toggle key is now K
---  - Each tab has its own search bar (live filtering)
---  - Lists repopulate on every tab click and on search text change
+-- Updates:
+--  - Toggle key: K
+--  - Keyword search: AND across words, OR within a word using "|" or "," (e.g., "red|blue chest")
+--  - New tab: Loot (all Model descendants under workspace.Environment.WorldModelSpawns.LootSpawnPoints)
+--  - Each tab re-scans on click and filters live as you type
 
 local Players = game:GetService("Players")
 local UIS = game:GetService("UserInputService")
@@ -24,7 +25,6 @@ local Colors = {
 	accent2 = Color3.fromRGB(255,210,0),     -- neon yellow
 	text = Color3.fromRGB(230, 255, 255),
 	textDim = Color3.fromRGB(160, 195, 195),
-	warn = Color3.fromRGB(255, 80, 80),
 }
 
 -- Helpers
@@ -72,14 +72,59 @@ local function autoScroll(scroller)
 	return layout
 end
 
-local function iContains(name, query)
-	if not query or query == "" then return true end
-	local n, q = string.lower(tostring(name)), string.lower(tostring(query))
-	return string.find(n, q, 1, true) ~= nil
+-- Build a searchable string from an instance (name + a few ancestors + class)
+local function buildSearchString(instance)
+	local parts = {}
+	table.insert(parts, instance.Name)
+	table.insert(parts, instance.ClassName)
+	local p = instance.Parent
+	local hops = 0
+	while p and hops < 4 do
+		table.insert(parts, p.Name)
+		p = p.Parent
+		hops += 1
+	end
+	return string.lower(table.concat(parts, " "))
+end
+
+-- Parse query into AND groups of OR alternatives
+-- "red|blue chest" -> {{"red","blue"}, {"chest"}}
+local function parseKeywordGroups(query)
+	local groups = {}
+	if not query or query == "" then return groups end
+	query = string.lower(query)
+	-- Keep | and , as OR delimiters; keep - and _ inside tokens; other punctuation -> space
+	query = query:gsub("[^%w%|%,%-%_%s]", " ")
+	for token in string.gmatch(query, "%S+") do
+		local alts = {}
+		for alt in string.gmatch(token, "[^|,]+") do
+			if alt ~= "" then table.insert(alts, alt) end
+		end
+		if #alts > 0 then table.insert(groups, alts) end
+	end
+	return groups
+end
+
+local function matchesKeywords(instance, query)
+	local groups = parseKeywordGroups(query)
+	if #groups == 0 then return true end
+	local text = buildSearchString(instance)
+	for _, alts in ipairs(groups) do
+		local found = false
+		for _, alt in ipairs(alts) do
+			if string.find(text, alt, 1, true) then
+				found = true
+				break
+			end
+		end
+		if not found then return false end
+	end
+	return true
 end
 
 -- Teleport utility
 local function teleportTo(target)
+	if not target or not target.Parent then return end
 	local char = player.Character or player.CharacterAdded:Wait()
 	local hrp = char:FindFirstChild("HumanoidRootPart") or char:WaitForChild("HumanoidRootPart")
 	if not hrp then return end
@@ -120,7 +165,7 @@ local main = make(Instance.new("Frame"), {
 corner(main, 10); neonStroke(main, Colors.accent, 2)
 
 -- Accent rim
-local rimTop = make(Instance.new("Frame"), {
+make(Instance.new("Frame"), {
 	Size = UDim2.new(1, 0, 0, 3),
 	BackgroundColor3 = Colors.accent2,
 	BackgroundTransparency = 0.2,
@@ -138,7 +183,7 @@ local titleBar = make(Instance.new("Frame"), {
 corner(titleBar, 10); neonStroke(titleBar, Colors.accent, 1)
 vPadding(titleBar, 6)
 
-local titleLabel = make(Instance.new("TextLabel"), {
+make(Instance.new("TextLabel"), {
 	Size = UDim2.new(1, -80, 1, 0),
 	Position = UDim2.fromOffset(12, 0),
 	BackgroundTransparency = 1,
@@ -150,7 +195,7 @@ local titleLabel = make(Instance.new("TextLabel"), {
 	Parent = titleBar
 })
 
-local hintLabel = make(Instance.new("TextLabel"), {
+make(Instance.new("TextLabel"), {
 	Size = UDim2.new(0, 120, 1, 0),
 	Position = UDim2.new(1, -126, 0, 0),
 	BackgroundTransparency = 1,
@@ -208,6 +253,7 @@ end
 local itemsTab = makeTabButton("Items")
 local ammoTab = makeTabButton("Ammo")
 local interactTab = makeTabButton("Interactables")
+local lootTab = makeTabButton("Loot")
 
 -- Content region
 local content = make(Instance.new("Frame"), {
@@ -242,7 +288,7 @@ local function makeSearchPage(placeholderText)
 	searchIcon.Size = UDim2.new(0, 26, 1, 0)
 	searchIcon.BackgroundTransparency = 1
 	searchIcon.Font = Enum.Font.GothamBold
-	searchIcon.Text = "⌕" -- stylized search
+	searchIcon.Text = "⌕"
 	searchIcon.TextColor3 = Colors.accent2
 	searchIcon.TextScaled = true
 	searchIcon.Parent = searchFrame
@@ -272,6 +318,9 @@ local function makeSearchPage(placeholderText)
 	clearBtn.TextColor3 = Colors.textDim
 	clearBtn.AutoButtonColor = false
 	clearBtn.Parent = searchFrame
+	clearBtn.MouseButton1Click:Connect(function()
+		searchBox.Text = ""
+	end)
 
 	-- Scroll area
 	local scroll = Instance.new("ScrollingFrame")
@@ -287,17 +336,13 @@ local function makeSearchPage(placeholderText)
 	corner(scroll, 8); neonStroke(scroll, Colors.accent, 1)
 	autoScroll(scroll)
 
-	-- Clear button behavior
-	clearBtn.MouseButton1Click:Connect(function()
-		searchBox.Text = ""
-	end)
-
 	return page, scroll, searchBox
 end
 
-local itemsPage, itemsScroll, itemsSearch = makeSearchPage("Search Items...")
-local ammoPage, ammoScroll, ammoSearch = makeSearchPage("Search Ammo...")
+local itemsPage, itemsScroll, itemsSearch = makeSearchPage("Keywords: e.g. crate red|blue")
+local ammoPage, ammoScroll, ammoSearch = makeSearchPage("Keywords: e.g. shell 9mm")
 local interactPage, interactScroll, interactSearch = makeSearchPage("Search Interactables...")
+local lootPage, lootScroll, lootSearch = makeSearchPage("Search Loot...")
 
 -- List item factory
 local function makeListButton(parent, labelText, targetRef)
@@ -335,7 +380,7 @@ local function makeListButton(parent, labelText, targetRef)
 	end)
 end
 
--- Clearing utility: only remove actual list items
+-- Clear only list items
 local function clearList(parent)
 	for _, c in ipairs(parent:GetChildren()) do
 		if c:IsA("TextButton") and c.Name == "ListItem" then
@@ -344,14 +389,14 @@ local function clearList(parent)
 	end
 end
 
--- Populate functions (accept query text)
+-- Populate functions (keyword-aware)
 local function populateItems(query)
 	clearList(itemsScroll)
 	for _, child in ipairs(workspace:GetChildren()) do
 		if child:IsA("Model") and child.Parent == workspace then
 			-- Ignore player characters
 			if not child:FindFirstChildOfClass("Humanoid") then
-				if iContains(child.Name, query) then
+				if matchesKeywords(child, query) then
 					makeListButton(itemsScroll, child.Name, child)
 				end
 			end
@@ -370,7 +415,7 @@ local function populateAmmo(query)
 
 	for _, desc in ipairs(ammoRoot:GetDescendants()) do
 		if desc:IsA("MeshPart") then
-			if iContains(desc.Name, query) then
+			if matchesKeywords(desc, query) then
 				makeListButton(ammoScroll, desc.Name, desc)
 			end
 		end
@@ -386,8 +431,26 @@ local function populateInteractables(query)
 
 	for _, desc in ipairs(inter:GetDescendants()) do
 		if desc:IsA("Model") and not desc:FindFirstChildOfClass("Humanoid") then
-			if iContains(desc.Name, (query)) then
+			if matchesKeywords(desc, query) then
 				makeListButton(interactScroll, desc.Name, desc)
+			end
+		end
+	end
+end
+
+local function populateLoot(query)
+	clearList(lootScroll)
+	local env = workspace:FindFirstChild("Environment")
+	if not env then return end
+	local wms = env:FindFirstChild("WorldModelSpawns")
+	if not wms then return end
+	local lootRoot = wms:FindFirstChild("LootSpawnPoints")
+	if not lootRoot then return end
+
+	for _, desc in ipairs(lootRoot:GetDescendants()) do
+		if desc:IsA("Model") then
+			if matchesKeywords(desc, query) then
+				makeListButton(lootScroll, desc.Name, desc)
 			end
 		end
 	end
@@ -397,33 +460,37 @@ end
 local pages = {
 	Items = itemsPage,
 	Ammo = ammoPage,
-	Interactables = interactPage
+	Interactables = interactPage,
+	Loot = lootPage
 }
 local scrolls = {
 	Items = itemsScroll,
 	Ammo = ammoScroll,
-	Interactables = interactScroll
+	Interactables = interactScroll,
+	Loot = lootScroll
 }
 local searches = {
 	Items = itemsSearch,
 	Ammo = ammoSearch,
-	Interactables = interactSearch
+	Interactables = interactSearch,
+	Loot = lootSearch
 }
 local populators = {
 	Items = populateItems,
 	Ammo = populateAmmo,
-	Interactables = populateInteractables
+	Interactables = populateInteractables,
+	Loot = populateLoot
 }
 local tabButtons = {
 	Items = itemsTab,
 	Ammo = ammoTab,
-	Interactables = interactTab
+	Interactables = interactTab,
+	Loot = lootTab
 }
 
 local currentTab = nil
 
 local function showTab(name)
-	-- Repopulate with current search query whenever the tab is clicked/shown
 	local query = ""
 	local s = searches[name]
 	if s then query = s.Text or "" end
@@ -434,12 +501,10 @@ local function showTab(name)
 		if not ok then warn("[CyberScanner] Populate error for "..name..": "..tostring(err)) end
 	end
 
-	-- Show selected page only
 	for tabName, page in pairs(pages) do
 		page.Visible = (tabName == name)
 	end
 
-	-- Visual state
 	for tabName, btn in pairs(tabButtons) do
 		btn.TextColor3 = (tabName == name) and Colors.text or Colors.textDim
 		local ul = btn:FindFirstChild("Underline")
@@ -453,6 +518,7 @@ end
 itemsTab.MouseButton1Click:Connect(function() showTab("Items") end)
 ammoTab.MouseButton1Click:Connect(function() showTab("Ammo") end)
 interactTab.MouseButton1Click:Connect(function() showTab("Interactables") end)
+lootTab.MouseButton1Click:Connect(function() showTab("Loot") end)
 
 -- Live search wiring per tab
 local function wireSearch(tabName)
@@ -466,9 +532,9 @@ local function wireSearch(tabName)
 	end)
 end
 
-wireSearch("Items")
-wireSearch("Ammo")
-wireSearch("Interactables")
+for name, _ in pairs(searches) do
+	wireSearch(name)
+end
 
 -- Default open tab
 showTab("Items")
