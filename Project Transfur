@@ -1,0 +1,518 @@
+-- Cyberpunk Finder GUI (LocalScript)
+-- Changes:
+--  - Toggle key is now K
+--  - Each tab has its own search bar (live filtering)
+--  - Lists repopulate on every tab click and on search text change
+
+local Players = game:GetService("Players")
+local UIS = game:GetService("UserInputService")
+local TweenService = game:GetService("TweenService")
+
+local player = Players.LocalPlayer
+local pg = player:WaitForChild("PlayerGui")
+
+-- Clean re-run
+local existing = pg:FindFirstChild("CyberFinderGui")
+if existing then existing:Destroy() end
+
+-- THEME
+local Colors = {
+	bg = Color3.fromRGB(9,12,20),
+	panel = Color3.fromRGB(18,22,36),
+	panelDark = Color3.fromRGB(14,18,30),
+	accent = Color3.fromRGB(0,255,170),      -- neon cyan
+	accent2 = Color3.fromRGB(255,210,0),     -- neon yellow
+	text = Color3.fromRGB(230, 255, 255),
+	textDim = Color3.fromRGB(160, 195, 195),
+	warn = Color3.fromRGB(255, 80, 80),
+}
+
+-- Helpers
+local function make(instance, props, children)
+	for k, v in pairs(props or {}) do instance[k] = v end
+	for _, child in ipairs(children or {}) do child.Parent = instance end
+	return instance
+end
+
+local function neonStroke(parent, color, thickness)
+	return make(Instance.new("UIStroke"), {
+		Color = color,
+		Thickness = thickness or 2,
+		Transparency = 0.15,
+		ApplyStrokeMode = Enum.ApplyStrokeMode.Border,
+		LineJoinMode = Enum.LineJoinMode.Round,
+		Parent = parent
+	})
+end
+
+local function corner(parent, r)
+	return make(Instance.new("UICorner"), { CornerRadius = UDim.new(0, r or 8), Parent = parent })
+end
+
+local function vPadding(parent, px)
+	local pad = Instance.new("UIPadding")
+	pad.PaddingTop = UDim.new(0, px)
+	pad.PaddingBottom = UDim.new(0, px)
+	pad.PaddingLeft = UDim.new(0, px)
+	pad.PaddingRight = UDim.new(0, px)
+	pad.Parent = parent
+	return pad
+end
+
+local function autoScroll(scroller)
+	local layout = Instance.new("UIListLayout")
+	layout.Padding = UDim.new(0, 6)
+	layout.SortOrder = Enum.SortOrder.LayoutOrder
+	layout.Parent = scroller
+	local function update()
+		scroller.CanvasSize = UDim2.new(0, 0, 0, layout.AbsoluteContentSize.Y + 10)
+	end
+	layout:GetPropertyChangedSignal("AbsoluteContentSize"):Connect(update)
+	update()
+	return layout
+end
+
+local function iContains(name, query)
+	if not query or query == "" then return true end
+	local n, q = string.lower(tostring(name)), string.lower(tostring(query))
+	return string.find(n, q, 1, true) ~= nil
+end
+
+-- Teleport utility
+local function teleportTo(target)
+	local char = player.Character or player.CharacterAdded:Wait()
+	local hrp = char:FindFirstChild("HumanoidRootPart") or char:WaitForChild("HumanoidRootPart")
+	if not hrp then return end
+
+	local cf
+	if target:IsA("Model") then
+		cf = target:GetPivot()
+	elseif target:IsA("BasePart") then
+		cf = target.CFrame
+	else
+		return
+	end
+
+	local offset = Vector3.new(0, 4, 0)
+	hrp.CFrame = CFrame.new((cf.Position + offset), cf.Position + cf.LookVector * 10)
+end
+
+-- GUI ROOT
+local gui = make(Instance.new("ScreenGui"), {
+	Name = "CyberFinderGui",
+	ResetOnSpawn = false,
+	IgnoreGuiInset = true,
+	ZIndexBehavior = Enum.ZIndexBehavior.Sibling,
+	Parent = pg
+})
+
+-- Main window
+local main = make(Instance.new("Frame"), {
+	Name = "Main",
+	Size = UDim2.fromScale(0.42, 0.52),
+	Position = UDim2.fromScale(0.5, 0.52),
+	AnchorPoint = Vector2.new(0.5, 0.5),
+	BackgroundColor3 = Colors.panel,
+	BorderSizePixel = 0,
+	Active = true,
+	Parent = gui
+})
+corner(main, 10); neonStroke(main, Colors.accent, 2)
+
+-- Accent rim
+local rimTop = make(Instance.new("Frame"), {
+	Size = UDim2.new(1, 0, 0, 3),
+	BackgroundColor3 = Colors.accent2,
+	BackgroundTransparency = 0.2,
+	Parent = main
+})
+
+-- Title bar
+local titleBar = make(Instance.new("Frame"), {
+	Name = "TitleBar",
+	Size = UDim2.new(1, 0, 0, 34),
+	BackgroundColor3 = Colors.panelDark,
+	BorderSizePixel = 0,
+	Parent = main
+})
+corner(titleBar, 10); neonStroke(titleBar, Colors.accent, 1)
+vPadding(titleBar, 6)
+
+local titleLabel = make(Instance.new("TextLabel"), {
+	Size = UDim2.new(1, -80, 1, 0),
+	Position = UDim2.fromOffset(12, 0),
+	BackgroundTransparency = 1,
+	Font = Enum.Font.GothamBold,
+	Text = "CYBER SCANNER",
+	TextColor3 = Colors.text,
+	TextSize = 18,
+	TextXAlignment = Enum.TextXAlignment.Left,
+	Parent = titleBar
+})
+
+local hintLabel = make(Instance.new("TextLabel"), {
+	Size = UDim2.new(0, 120, 1, 0),
+	Position = UDim2.new(1, -126, 0, 0),
+	BackgroundTransparency = 1,
+	Font = Enum.Font.GothamSemibold,
+	Text = "[K] Toggle",
+	TextColor3 = Colors.textDim,
+	TextScaled = true,
+	TextXAlignment = Enum.TextXAlignment.Right,
+	Parent = titleBar
+})
+
+-- Tab bar
+local tabBar = make(Instance.new("Frame"), {
+	Name = "TabBar",
+	Size = UDim2.new(1, -16, 0, 38),
+	Position = UDim2.new(0, 8, 0, 38),
+	BackgroundColor3 = Colors.panelDark,
+	BorderSizePixel = 0,
+	Parent = main
+})
+corner(tabBar, 8); neonStroke(tabBar, Colors.accent, 1)
+vPadding(tabBar, 4)
+local tabLayout = Instance.new("UIListLayout")
+tabLayout.FillDirection = Enum.FillDirection.Horizontal
+tabLayout.Padding = UDim.new(0, 6)
+tabLayout.Parent = tabBar
+
+local function makeTabButton(text)
+	local btn = Instance.new("TextButton")
+	btn.Name = text .. "Tab"
+	btn.Size = UDim2.new(0, 120, 1, -8)
+	btn.BackgroundColor3 = Colors.panel
+	btn.AutoButtonColor = false
+	btn.Text = text:upper()
+	btn.Font = Enum.Font.GothamBold
+	btn.TextSize = 14
+	btn.TextColor3 = Colors.textDim
+	btn.BorderSizePixel = 0
+	btn.Parent = tabBar
+	corner(btn, 6)
+	neonStroke(btn, Colors.accent, 1)
+
+	local underline = Instance.new("Frame")
+	underline.Name = "Underline"
+	underline.Size = UDim2.new(1, 0, 0, 2)
+	underline.Position = UDim2.new(0, 0, 1, -2)
+	underline.BackgroundColor3 = Colors.accent2
+	underline.BackgroundTransparency = 0.5
+	underline.Visible = false
+	underline.Parent = btn
+
+	return btn
+end
+
+local itemsTab = makeTabButton("Items")
+local ammoTab = makeTabButton("Ammo")
+local interactTab = makeTabButton("Interactables")
+
+-- Content region
+local content = make(Instance.new("Frame"), {
+	Name = "Content",
+	Size = UDim2.new(1, -16, 1, -38 - 46 - 16),
+	Position = UDim2.new(0, 8, 0, 38 + 46),
+	BackgroundColor3 = Colors.panelDark,
+	BorderSizePixel = 0,
+	Parent = main
+})
+corner(content, 10); neonStroke(content, Colors.accent, 1)
+vPadding(content, 8)
+
+-- Search + Page factory
+local function makeSearchPage(placeholderText)
+	local page = Instance.new("Frame")
+	page.BackgroundTransparency = 1
+	page.Size = UDim2.new(1, 0, 1, 0)
+	page.Visible = false
+	page.Parent = content
+
+	-- Search bar
+	local searchFrame = Instance.new("Frame")
+	searchFrame.Name = "SearchFrame"
+	searchFrame.Size = UDim2.new(1, 0, 0, 32)
+	searchFrame.BackgroundColor3 = Colors.panel
+	searchFrame.BorderSizePixel = 0
+	searchFrame.Parent = page
+	corner(searchFrame, 6); neonStroke(searchFrame, Colors.accent, 1)
+
+	local searchIcon = Instance.new("TextLabel")
+	searchIcon.Size = UDim2.new(0, 26, 1, 0)
+	searchIcon.BackgroundTransparency = 1
+	searchIcon.Font = Enum.Font.GothamBold
+	searchIcon.Text = "⌕" -- stylized search
+	searchIcon.TextColor3 = Colors.accent2
+	searchIcon.TextScaled = true
+	searchIcon.Parent = searchFrame
+
+	local searchBox = Instance.new("TextBox")
+	searchBox.Name = "SearchBox"
+	searchBox.Size = UDim2.new(1, -64, 1, 0)
+	searchBox.Position = UDim2.new(0, 28, 0, 0)
+	searchBox.BackgroundTransparency = 1
+	searchBox.ClearTextOnFocus = false
+	searchBox.Font = Enum.Font.GothamSemibold
+	searchBox.PlaceholderText = placeholderText
+	searchBox.PlaceholderColor3 = Colors.textDim
+	searchBox.TextXAlignment = Enum.TextXAlignment.Left
+	searchBox.TextColor3 = Colors.text
+	searchBox.TextSize = 14
+	searchBox.Text = ""
+	searchBox.Parent = searchFrame
+
+	local clearBtn = Instance.new("TextButton")
+	clearBtn.Size = UDim2.new(0, 28, 1, 0)
+	clearBtn.Position = UDim2.new(1, -28, 0, 0)
+	clearBtn.BackgroundTransparency = 1
+	clearBtn.Text = "✕"
+	clearBtn.Font = Enum.Font.GothamBold
+	clearBtn.TextScaled = true
+	clearBtn.TextColor3 = Colors.textDim
+	clearBtn.AutoButtonColor = false
+	clearBtn.Parent = searchFrame
+
+	-- Scroll area
+	local scroll = Instance.new("ScrollingFrame")
+	scroll.Active = true
+	scroll.BackgroundColor3 = Colors.panel
+	scroll.BorderSizePixel = 0
+	scroll.Position = UDim2.new(0, 0, 0, 32 + 6)
+	scroll.Size = UDim2.new(1, 0, 1, -(32 + 6))
+	scroll.CanvasSize = UDim2.new(0,0,0,0)
+	scroll.ScrollBarThickness = 6
+	scroll.ScrollBarImageColor3 = Colors.accent2
+	scroll.Parent = page
+	corner(scroll, 8); neonStroke(scroll, Colors.accent, 1)
+	autoScroll(scroll)
+
+	-- Clear button behavior
+	clearBtn.MouseButton1Click:Connect(function()
+		searchBox.Text = ""
+	end)
+
+	return page, scroll, searchBox
+end
+
+local itemsPage, itemsScroll, itemsSearch = makeSearchPage("Search Items...")
+local ammoPage, ammoScroll, ammoSearch = makeSearchPage("Search Ammo...")
+local interactPage, interactScroll, interactSearch = makeSearchPage("Search Interactables...")
+
+-- List item factory
+local function makeListButton(parent, labelText, targetRef)
+	local btn = Instance.new("TextButton")
+	btn.Name = "ListItem"
+	btn.Size = UDim2.new(1, -8, 0, 38)
+	btn.Position = UDim2.fromOffset(4, 0)
+	btn.BackgroundColor3 = Colors.panelDark
+	btn.AutoButtonColor = false
+	btn.Text = ""
+	btn.Parent = parent
+	corner(btn, 6)
+	neonStroke(btn, Colors.accent, 1)
+
+	local lbl = Instance.new("TextLabel")
+	lbl.BackgroundTransparency = 1
+	lbl.Size = UDim2.new(1, -16, 1, 0)
+	lbl.Position = UDim2.fromOffset(8, 0)
+	lbl.Font = Enum.Font.GothamSemibold
+	lbl.TextXAlignment = Enum.TextXAlignment.Left
+	lbl.TextColor3 = Colors.text
+	lbl.TextSize = 14
+	lbl.Text = labelText
+	lbl.Parent = btn
+
+	btn.MouseEnter:Connect(function()
+		TweenService:Create(btn, TweenInfo.new(0.12), {BackgroundColor3 = Colors.panel}):Play()
+	end)
+	btn.MouseLeave:Connect(function()
+		TweenService:Create(btn, TweenInfo.new(0.12), {BackgroundColor3 = Colors.panelDark}):Play()
+	end)
+
+	btn.MouseButton1Click:Connect(function()
+		teleportTo(targetRef)
+	end)
+end
+
+-- Clearing utility: only remove actual list items
+local function clearList(parent)
+	for _, c in ipairs(parent:GetChildren()) do
+		if c:IsA("TextButton") and c.Name == "ListItem" then
+			c:Destroy()
+		end
+	end
+end
+
+-- Populate functions (accept query text)
+local function populateItems(query)
+	clearList(itemsScroll)
+	for _, child in ipairs(workspace:GetChildren()) do
+		if child:IsA("Model") and child.Parent == workspace then
+			-- Ignore player characters
+			if not child:FindFirstChildOfClass("Humanoid") then
+				if iContains(child.Name, query) then
+					makeListButton(itemsScroll, child.Name, child)
+				end
+			end
+		end
+	end
+end
+
+local function populateAmmo(query)
+	clearList(ammoScroll)
+	local env = workspace:FindFirstChild("Environment")
+	if not env then return end
+	local inter = env:FindFirstChild("Interactable")
+	if not inter then return end
+	local ammoRoot = inter:FindFirstChild("Ammo")
+	if not ammoRoot then return end
+
+	for _, desc in ipairs(ammoRoot:GetDescendants()) do
+		if desc:IsA("MeshPart") then
+			if iContains(desc.Name, query) then
+				makeListButton(ammoScroll, desc.Name, desc)
+			end
+		end
+	end
+end
+
+local function populateInteractables(query)
+	clearList(interactScroll)
+	local env = workspace:FindFirstChild("Environment")
+	if not env then return end
+	local inter = env:FindFirstChild("Interactable")
+	if not inter then return end
+
+	for _, desc in ipairs(inter:GetDescendants()) do
+		if desc:IsA("Model") and not desc:FindFirstChildOfClass("Humanoid") then
+			if iContains(desc.Name, (query)) then
+				makeListButton(interactScroll, desc.Name, desc)
+			end
+		end
+	end
+end
+
+-- Tab switching and live search
+local pages = {
+	Items = itemsPage,
+	Ammo = ammoPage,
+	Interactables = interactPage
+}
+local scrolls = {
+	Items = itemsScroll,
+	Ammo = ammoScroll,
+	Interactables = interactScroll
+}
+local searches = {
+	Items = itemsSearch,
+	Ammo = ammoSearch,
+	Interactables = interactSearch
+}
+local populators = {
+	Items = populateItems,
+	Ammo = populateAmmo,
+	Interactables = populateInteractables
+}
+local tabButtons = {
+	Items = itemsTab,
+	Ammo = ammoTab,
+	Interactables = interactTab
+}
+
+local currentTab = nil
+
+local function showTab(name)
+	-- Repopulate with current search query whenever the tab is clicked/shown
+	local query = ""
+	local s = searches[name]
+	if s then query = s.Text or "" end
+
+	local populate = populators[name]
+	if populate then
+		local ok, err = pcall(function() populate(query) end)
+		if not ok then warn("[CyberScanner] Populate error for "..name..": "..tostring(err)) end
+	end
+
+	-- Show selected page only
+	for tabName, page in pairs(pages) do
+		page.Visible = (tabName == name)
+	end
+
+	-- Visual state
+	for tabName, btn in pairs(tabButtons) do
+		btn.TextColor3 = (tabName == name) and Colors.text or Colors.textDim
+		local ul = btn:FindFirstChild("Underline")
+		if ul then ul.Visible = (tabName == name) end
+	end
+
+	currentTab = name
+end
+
+-- Wire tab buttons
+itemsTab.MouseButton1Click:Connect(function() showTab("Items") end)
+ammoTab.MouseButton1Click:Connect(function() showTab("Ammo") end)
+interactTab.MouseButton1Click:Connect(function() showTab("Interactables") end)
+
+-- Live search wiring per tab
+local function wireSearch(tabName)
+	local box = searches[tabName]
+	if not box then return end
+	box:GetPropertyChangedSignal("Text"):Connect(function()
+		if currentTab == tabName then
+			local fn = populators[tabName]
+			if fn then fn(box.Text) end
+		end
+	end)
+end
+
+wireSearch("Items")
+wireSearch("Ammo")
+wireSearch("Interactables")
+
+-- Default open tab
+showTab("Items")
+
+-- Draggable window (drag by title bar)
+do
+	local dragging = false
+	local dragStart, startPos
+	titleBar.InputBegan:Connect(function(input)
+		if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+			dragging = true
+			dragStart = input.Position
+			startPos = main.Position
+			input.Changed:Connect(function()
+				if input.UserInputState == Enum.UserInputState.End then
+					dragging = false
+				end
+			end)
+		end
+	end)
+	UIS.InputChanged:Connect(function(input)
+		if dragging and (input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch) then
+			local delta = input.Position - dragStart
+			main.Position = UDim2.new(
+				startPos.X.Scale, startPos.X.Offset + delta.X,
+				startPos.Y.Scale, startPos.Y.Offset + delta.Y
+			)
+		end
+	end)
+end
+
+-- Toggle with K
+local isOpen = true
+local function setOpen(state)
+	isOpen = state
+	main.Visible = state
+end
+UIS.InputBegan:Connect(function(input, gpe)
+	if gpe then return end
+	if input.KeyCode == Enum.KeyCode.K then
+		setOpen(not isOpen)
+	end
+end)
+
+-- Fade in on spawn
+main.Visible = false
+setOpen(true)
