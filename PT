@@ -29,6 +29,27 @@ end
 local player    = Players.LocalPlayer
 local playerGui = player:WaitForChild("PlayerGui")
 
+-- Permanently disable the Roblox inventory (Backpack)
+local function disableBackpackPermanently()
+	-- Try until Core is ready
+	for i = 1, 50 do
+		local ok = pcall(function()
+			game:GetService("StarterGui"):SetCoreGuiEnabled(Enum.CoreGuiType.Backpack, false)
+		end)
+		if ok then break end
+		task.wait(0.1)
+	end
+	-- Reassert on respawn just in case
+	game:GetService("Players").LocalPlayer.CharacterAdded:Connect(function()
+		pcall(function()
+			game:GetService("StarterGui"):SetCoreGuiEnabled(Enum.CoreGuiType.Backpack, false)
+		end)
+	end)
+end
+
+-- Call once at startup
+disableBackpackPermanently()
+
 -- One-time notification to the local player at script start.
 -- Tries Roblox CoreGui notification first; if SetCore isn't ready,
 -- shows a custom bottom-right toast instead.
@@ -207,22 +228,43 @@ title.Position = UDim2.new(0, PAD, 0, 0)
 title.Parent = titleBar
 
 ----------------------------------------------------------------------
--- Tabs row (centered with UIListLayout)
+-- Tabs row with horizontal scrolling (replaces your tabsStrip Frame block)
 ----------------------------------------------------------------------
-local tabsStrip = Instance.new("Frame")
+local tabsStrip = Instance.new("ScrollingFrame")
 tabsStrip.Name = "TabsStrip"
+tabsStrip.Parent = container
 tabsStrip.BackgroundTransparency = 1
 tabsStrip.Size = UDim2.new(1, 0, 0, TABS_H)
 tabsStrip.Position = UDim2.new(0, 0, 0, TITLE_H + GAP)
-tabsStrip.Parent = container
+tabsStrip.BorderSizePixel = 0
+tabsStrip.ScrollingDirection = Enum.ScrollingDirection.X
+tabsStrip.AutomaticCanvasSize = Enum.AutomaticSize.X
+tabsStrip.ScrollBarThickness = 6
+tabsStrip.ScrollBarImageColor3 = Color3.fromRGB(170, 82, 205) -- theme
+tabsStrip.CanvasSize = UDim2.new(0, 0, 0, 0)
 
-local tabsLayout = Instance.new("UIListLayout")
+local tabsPad = Instance.new("UIPadding", tabsStrip)
+tabsPad.PaddingLeft = UDim.new(0, 8)
+tabsPad.PaddingRight = UDim.new(0, 8)
+
+-- After you create tabsStrip (ScrollingFrame) and tabsPad:
+local SCROLLBAR_GAP = 8  -- how far below the tabs the bar sits
+
+-- Make the strip a bit taller to reserve space for the bar
+tabsStrip.Size = UDim2.new(1, 0, 0, TABS_H + SCROLLBAR_GAP)
+
+-- Add bottom padding so content doesn't touch the bar
+tabsPad.PaddingBottom = UDim.new(0, SCROLLBAR_GAP)
+
+-- Optional: a tiny top pad to center visually
+tabsPad.PaddingTop = UDim.new(0, 2)
+
+local tabsLayout = Instance.new("UIListLayout", tabsStrip)
 tabsLayout.FillDirection = Enum.FillDirection.Horizontal
-tabsLayout.HorizontalAlignment = Enum.HorizontalAlignment.Center
+tabsLayout.HorizontalAlignment = Enum.HorizontalAlignment.Left -- left, because we can scroll
 tabsLayout.VerticalAlignment = Enum.VerticalAlignment.Center
 tabsLayout.SortOrder = Enum.SortOrder.LayoutOrder
 tabsLayout.Padding = UDim.new(0, TAB_GAP)
-tabsLayout.Parent = tabsStrip
 
 local function makeTab(label, order)
 	local b = Instance.new("TextButton")
@@ -235,7 +277,7 @@ local function makeTab(label, order)
 	b.AutoButtonColor = false
 	b.BackgroundColor3 = TAB
 	b.BorderSizePixel = 0
-	b.Size = UDim2.new(0, TAB_W, 1, 0)
+	b.Size = UDim2.new(0, TAB_W, 0, 32)
 	b.Parent = tabsStrip
 	corner(b, 8)
 	stroke(b, TAB_SEL, 1, 0.75)
@@ -268,7 +310,13 @@ end
 local tabItems = makeTab("Items", 1)
 local tabAmmo  = makeTab("Ammo",  2)
 local tabMisc  = makeTab("Misc",  3)
-local tabList  = {tabItems, tabAmmo, tabMisc}
+local tabShop  = makeTab("Shop",  4)
+
+-- Tabs (add two more)
+local tabCrates = makeTab("Crates", 5)
+local tabTrash  = makeTab("Trash",  6)
+
+local tabList  = {tabItems, tabAmmo, tabMisc, tabShop, tabCrates, tabTrash}
 
 ----------------------------------------------------------------------
 -- Content area fills remaining space
@@ -672,7 +720,636 @@ task.spawn(function()
 end)
 
 local pageMisc  = makePage("MiscPage")
-local pageList  = {pageItems, pageAmmo, pageMisc}
+
+-- [Misc UI] Toggle row
+local miscContainer = Instance.new("Frame")
+miscContainer.BackgroundTransparency = 1
+miscContainer.Size = UDim2.new(1, -16, 1, -16)
+miscContainer.Position = UDim2.new(0, 8, 0, 8)
+miscContainer.Parent = pageMisc
+
+local miscLayout = Instance.new("UIListLayout")
+miscLayout.Padding = UDim.new(0, 10)
+miscLayout.SortOrder = Enum.SortOrder.LayoutOrder
+miscLayout.Parent = miscContainer
+
+local row = Instance.new("Frame")
+row.BackgroundTransparency = 1
+row.Size = UDim2.new(1, 0, 0, 36)
+row.Parent = miscContainer
+
+local label = Instance.new("TextLabel")
+label.BackgroundTransparency = 1
+label.Text = "Infinite Stamina"
+label.Font = Enum.Font.GothamBold
+label.TextSize = 16
+label.TextColor3 = Color3.new(1,1,1)
+label.TextXAlignment = Enum.TextXAlignment.Left
+label.Size = UDim2.new(1, -120, 1, 0)
+label.Parent = row
+
+-- Pill switch (right side)
+local switch = Instance.new("TextButton")
+switch.Name = "InfStaminaSwitch"
+switch.AutoButtonColor = false
+switch.Text = ""
+switch.AnchorPoint = Vector2.new(1, 0.5)
+switch.Position = UDim2.new(1, 0, 0.5, 0)
+switch.Size = UDim2.new(0, 64, 0, 28)
+switch.BackgroundColor3 = Color3.fromRGB(66, 47, 88) -- off color
+switch.BorderSizePixel = 0
+switch.Parent = row
+local swCorner = Instance.new("UICorner", switch) swCorner.CornerRadius = UDim.new(1, 0)
+local swStroke = Instance.new("UIStroke", switch) swStroke.Color = Color3.fromRGB(170, 82, 205) swStroke.Transparency = 0.4
+
+-- Knob
+local knob = Instance.new("Frame")
+knob.Name = "Knob"
+knob.AnchorPoint = Vector2.new(0, 0.5)
+knob.Position = UDim2.new(0, 3, 0.5, 0)
+knob.Size = UDim2.new(0, 24, 0, 24)
+knob.BackgroundColor3 = Color3.fromRGB(145, 59, 167)
+knob.BorderSizePixel = 0
+knob.Parent = switch
+local kCorner = Instance.new("UICorner", knob) kCorner.CornerRadius = UDim.new(1, 0)
+
+-- [Misc logic — SAFE Infinite Stamina toggle that won't break the UI]
+
+local RunService = game:GetService("RunService")
+
+-- UI helpers
+local function setSwitchVisual(isOn: boolean)
+	if isOn then
+		switch.BackgroundColor3 = Color3.fromRGB(90, 220, 255) -- cyan when ON
+		knob:TweenPosition(UDim2.new(1, -27, 0.5, 0), Enum.EasingDirection.Out, Enum.EasingStyle.Quad, 0.15, true)
+		knob.BackgroundColor3 = Color3.fromRGB(255, 105, 230) -- magenta knob
+	else
+		switch.BackgroundColor3 = Color3.fromRGB(66, 47, 88) -- off
+		knob:TweenPosition(UDim2.new(0, 3, 0.5, 0), Enum.EasingDirection.Out, Enum.EasingStyle.Quad, 0.15, true)
+		knob.BackgroundColor3 = Color3.fromRGB(145, 59, 167)
+	end
+end
+
+-- Locate the aspect folders the movement/UI read
+local function getAspectFolders()
+	local char = player.Character or player.CharacterAdded:Wait()
+	local config = char:FindFirstChildWhichIsA("Configuration")
+	if not config then return end
+	local aspects = config:FindFirstChild("ReplicatedAspects")
+	if not aspects then return end
+	return aspects:FindFirstChild("LocalStamina"), aspects:FindFirstChild("StaminaState")
+end
+
+-- Capture original values (so we can restore and keep the UI consistent)
+local snapshot -- { lsMax, ssMax, lsThreshold, ssThreshold }
+local function captureOriginalStamina()
+	local ls, ss = getAspectFolders()
+	if not ls and not ss then return end
+	snapshot = snapshot or {}
+	if ls then
+		if snapshot.lsMax == nil then snapshot.lsMax = ls:GetAttribute("Max") end
+		if snapshot.lsThreshold == nil then snapshot.lsThreshold = ls:GetAttribute("Threshold") end
+	end
+	if ss then
+		if snapshot.ssMax == nil then snapshot.ssMax = ss:GetAttribute("Max") end
+		if snapshot.ssThreshold == nil then snapshot.ssThreshold = ss:GetAttribute("Threshold") end
+	end
+end
+
+-- Keep stamina full without changing Max or regen flags
+local function pushInfiniteStamina()
+	local ls, ss = getAspectFolders()
+	if ls then
+		local mx = ls:GetAttribute("Max") or 100
+		if ls:GetAttribute("Current") ~= mx then ls:SetAttribute("Current", mx) end
+		if ls:GetAttribute("AtThreshold") ~= false then ls:SetAttribute("AtThreshold", false) end
+	end
+	if ss then
+		local mx = ss:GetAttribute("Max") or 100
+		if ss:GetAttribute("Current") ~= mx then ss:SetAttribute("Current", mx) end
+		if ss:GetAttribute("AtThreshold") ~= false then ss:SetAttribute("AtThreshold", false) end
+	end
+end
+
+-- Restore and gently "nudge" Current so UI Change listeners re-evaluate
+local function restoreOriginalStamina()
+	local ls, ss = getAspectFolders()
+	if snapshot then
+		if ls and snapshot.lsMax then
+			local cur = ls:GetAttribute("Current")
+			local mx  = ls:GetAttribute("Max") or snapshot.lsMax
+			-- Clamp any overshoot
+			if typeof(cur) == "number" and cur > mx then ls:SetAttribute("Current", mx) end
+			if snapshot.lsThreshold ~= nil then ls:SetAttribute("Threshold", snapshot.lsThreshold) end
+		end
+		if ss and snapshot.ssMax then
+			local cur = ss:GetAttribute("Current")
+			local mx  = ss:GetAttribute("Max") or snapshot.ssMax
+			if typeof(cur) == "number" and cur > mx then ss:SetAttribute("Current", mx) end
+			if snapshot.ssThreshold ~= nil then ss:SetAttribute("Threshold", snapshot.ssThreshold) end
+		end
+	end
+
+	-- Nudge to force UI refresh even if numbers "look" the same
+	task.defer(function()
+		local ls2, ss2 = getAspectFolders()
+		if ls2 then
+			local c = ls2:GetAttribute("Current")
+			if typeof(c) == "number" then
+				ls2:SetAttribute("Current", math.max(0, c - 0.001))
+				task.wait()
+				ls2:SetAttribute("Current", c)
+			end
+		end
+		if ss2 then
+			local c = ss2:GetAttribute("Current")
+			if typeof(c) == "number" then
+				ss2:SetAttribute("Current", math.max(0, c - 0.001))
+				task.wait()
+				ss2:SetAttribute("Current", c)
+			end
+		end
+	end)
+end
+
+-- Toggle state
+local ATTR_NAME = "PT_InfiniteStamina"
+local infEnabled = player:GetAttribute(ATTR_NAME) == true
+local hbConn: RBXScriptConnection? = nil
+local charConn: RBXScriptConnection? = nil
+
+local function startInfLoop()
+	if hbConn then hbConn:Disconnect() hbConn = nil end
+	captureOriginalStamina()
+	pushInfiniteStamina()
+	hbConn = RunService.Heartbeat:Connect(pushInfiniteStamina)
+	if charConn then charConn:Disconnect() end
+	charConn = player.CharacterAdded:Connect(function()
+		snapshot = nil    -- recapture per character
+		task.wait(0.25)
+		captureOriginalStamina()
+		if infEnabled then pushInfiniteStamina() end
+	end)
+end
+
+local function stopInfLoop()
+	if hbConn then hbConn:Disconnect() hbConn = nil end
+	if charConn then charConn:Disconnect() charConn = nil end
+	restoreOriginalStamina()
+end
+
+local function setInfEnabled(on: boolean)
+	infEnabled = on
+	player:SetAttribute(ATTR_NAME, on)
+	setSwitchVisual(on) -- uses your existing UI helper from the Misc toggle
+	if on then startInfLoop() else stopInfLoop() end
+end
+
+-- Initialize from saved state and wire the toggle button "switch"
+setInfEnabled(infEnabled or false)
+switch.MouseButton1Click:Connect(function()
+	setInfEnabled(not infEnabled)
+end)
+
+local pageShop  = makePage("ShopPage")
+
+-- Pages (add two more)
+local pageCrates = makePage("CratesPage")
+local pageTrash  = makePage("TrashPage")
+
+-- [Trash UI]
+local trashList = Instance.new("ScrollingFrame")
+trashList.Name = "TrashList"
+trashList.Parent = pageTrash
+trashList.BackgroundTransparency = 1
+trashList.BorderSizePixel = 0
+trashList.AutomaticCanvasSize = Enum.AutomaticSize.Y
+trashList.ScrollingDirection = Enum.ScrollingDirection.Y
+trashList.ScrollBarThickness = 8
+trashList.ScrollBarImageColor3 = Color3.fromRGB(170, 82, 205)
+trashList.Size = UDim2.new(1, -16, 1, -16)
+trashList.Position = UDim2.new(0, 8, 0, 8)
+
+local trashPad = Instance.new("UIPadding", trashList)
+trashPad.PaddingTop = UDim.new(0, 8)
+trashPad.PaddingLeft = UDim.new(0, 8)
+trashPad.PaddingRight = UDim.new(0, 8)
+trashPad.PaddingBottom = UDim.new(0, 8)
+
+local trashLayout = Instance.new("UIListLayout", trashList)
+trashLayout.SortOrder = Enum.SortOrder.Name
+trashLayout.Padding = UDim.new(0, 6)
+
+local function makeTrashButton(text)
+	local b = Instance.new("TextButton")
+	b.Name = text
+	b.Text = text
+	b.AutoButtonColor = false
+	b.Font = Enum.Font.GothamBold
+	b.TextSize = 14
+	b.TextColor3 = Color3.new(1,1,1)
+	b.BackgroundColor3 = Color3.fromRGB(145, 59, 167)
+	b.BorderSizePixel = 0
+	b.Size = UDim2.new(1, 0, 0, 30)
+	local c = Instance.new("UICorner", b) c.CornerRadius = UDim.new(0, 8)
+	local s = Instance.new("UIStroke", b) s.Color = Color3.fromRGB(170, 82, 205) s.Thickness = 1 s.Transparency = 0.6
+	b.MouseEnter:Connect(function() b.BackgroundColor3 = Color3.fromRGB(170, 82, 205) s.Transparency = 0.4 end)
+	b.MouseLeave:Connect(function() b.BackgroundColor3 = Color3.fromRGB(145, 59, 167) s.Transparency = 0.6 end)
+	return b
+end
+
+-- [Crates UI]
+local cratesList = Instance.new("ScrollingFrame")
+cratesList.Name = "CratesList"
+cratesList.Parent = pageCrates
+cratesList.BackgroundTransparency = 1
+cratesList.BorderSizePixel = 0
+cratesList.AutomaticCanvasSize = Enum.AutomaticSize.Y
+cratesList.ScrollingDirection = Enum.ScrollingDirection.Y
+cratesList.ScrollBarThickness = 8
+cratesList.ScrollBarImageColor3 = Color3.fromRGB(170, 82, 205)
+cratesList.Size = UDim2.new(1, -16, 1, -16)
+cratesList.Position = UDim2.new(0, 8, 0, 8)
+
+local cratesPad = Instance.new("UIPadding", cratesList)
+cratesPad.PaddingTop = UDim.new(0, 8)
+cratesPad.PaddingLeft = UDim.new(0, 8)
+cratesPad.PaddingRight = UDim.new(0, 8)
+cratesPad.PaddingBottom = UDim.new(0, 8)
+
+local cratesLayout = Instance.new("UIListLayout", cratesList)
+cratesLayout.SortOrder = Enum.SortOrder.Name
+cratesLayout.Padding = UDim.new(0, 6)
+
+local function makeCrateButton(text)
+	local b = Instance.new("TextButton")
+	b.Name = text
+	b.Text = text
+	b.AutoButtonColor = false
+	b.Font = Enum.Font.GothamBold
+	b.TextSize = 14
+	b.TextColor3 = Color3.new(1,1,1)
+	b.BackgroundColor3 = Color3.fromRGB(145, 59, 167)
+	b.BorderSizePixel = 0
+	b.Size = UDim2.new(1, 0, 0, 30)
+	local c = Instance.new("UICorner", b) c.CornerRadius = UDim.new(0, 8)
+	local s = Instance.new("UIStroke", b) s.Color = Color3.fromRGB(170, 82, 205) s.Thickness = 1 s.Transparency = 0.6
+	b.MouseEnter:Connect(function() b.BackgroundColor3 = Color3.fromRGB(170, 82, 205) s.Transparency = 0.4 end)
+	b.MouseLeave:Connect(function() b.BackgroundColor3 = Color3.fromRGB(145, 59, 167) s.Transparency = 0.6 end)
+	return b
+end
+
+-- [Shop UI] simple vertical list
+local shopList = Instance.new("ScrollingFrame")
+shopList.Name = "ShopList"
+shopList.Parent = pageShop
+shopList.BackgroundTransparency = 1
+shopList.BorderSizePixel = 0
+shopList.AutomaticCanvasSize = Enum.AutomaticSize.Y
+shopList.ScrollingDirection = Enum.ScrollingDirection.Y
+shopList.ScrollBarThickness = 8
+shopList.ScrollBarImageColor3 = Color3.fromRGB(170, 82, 205)
+shopList.Size = UDim2.new(1, -16, 1, -16)
+shopList.Position = UDim2.new(0, 8, 0, 8)
+
+local shopPad = Instance.new("UIPadding", shopList)
+shopPad.PaddingTop = UDim.new(0, 8)
+shopPad.PaddingLeft = UDim.new(0, 8)
+shopPad.PaddingRight = UDim.new(0, 8)
+shopPad.PaddingBottom = UDim.new(0, 8)
+
+local shopLayout = Instance.new("UIListLayout", shopList)
+shopLayout.SortOrder = Enum.SortOrder.Name
+shopLayout.Padding = UDim.new(0, 6)
+
+local function makeShopButton(text)
+	local b = Instance.new("TextButton")
+	b.Name = text
+	b.Text = text
+	b.AutoButtonColor = false
+	b.Font = Enum.Font.GothamBold
+	b.TextSize = 14
+	b.TextColor3 = Color3.new(1,1,1)
+	b.BackgroundColor3 = Color3.fromRGB(145, 59, 167)
+	b.BorderSizePixel = 0
+	b.Size = UDim2.new(1, 0, 0, 30)
+	local c = Instance.new("UICorner", b) c.CornerRadius = UDim.new(0, 8)
+	local s = Instance.new("UIStroke", b) s.Color = Color3.fromRGB(170, 82, 205) s.Thickness = 1 s.Transparency = 0.6
+	b.MouseEnter:Connect(function() b.BackgroundColor3 = Color3.fromRGB(170, 82, 205) s.Transparency = 0.4 end)
+	b.MouseLeave:Connect(function() b.BackgroundColor3 = Color3.fromRGB(145, 59, 167) s.Transparency = 0.6 end)
+	return b
+end
+
+-- Replace your existing tabList/pageList with these:
+local pageList  = {pageItems, pageAmmo, pageMisc, pageShop, pageCrates, pageTrash}
+
+-- [Crates logic] Any Model named "Military Crate" in the entire workspace
+local function tpToModelCrate(m: Instance)
+	if not m or not m:IsA("Model") then return end
+	local char = player.Character or player.CharacterAdded:Wait()
+	if not char then return end
+	local cf
+	local ok, pivot = pcall(function() return m:GetPivot() end)
+	if ok then cf = pivot
+	elseif m.PrimaryPart then cf = m.PrimaryPart.CFrame
+	else
+		local p = m:FindFirstChildWhichIsA("BasePart", true)
+		if p then cf = p.CFrame end
+	end
+	if not cf then return end
+	char:PivotTo(cf * CFrame.new(0, 4, 0))
+end
+
+local crateButtons: { [Model]: TextButton } = {}
+local crateNameConn: { [Model]: RBXScriptConnection } = {}
+local crateConns: { RBXScriptConnection } = {}
+
+local function addCrate(m: Model)
+	if crateButtons[m] then return end
+	if m.Name ~= "Military Crate" then return end
+	local b = makeCrateButton(m.Name)
+	b.Parent = cratesList
+	crateButtons[m] = b
+	b.MouseButton1Click:Connect(function() tpToModelCrate(m) end)
+	-- If it gets renamed away, remove it
+	crateNameConn[m] = m:GetPropertyChangedSignal("Name"):Connect(function()
+		if m.Name ~= "Military Crate" then
+			local btn = crateButtons[m]; if btn then btn:Destroy() end
+			crateButtons[m] = nil
+			if crateNameConn[m] then crateNameConn[m]:Disconnect() crateNameConn[m] = nil end
+		else
+			local btn = crateButtons[m]; if btn then btn.Name = m.Name; btn.Text = m.Name end
+		end
+	end)
+end
+
+local function removeCrate(m: Model)
+	local b = crateButtons[m]
+	if b then b:Destroy() end
+	crateButtons[m] = nil
+	if crateNameConn[m] then crateNameConn[m]:Disconnect() crateNameConn[m] = nil end
+end
+
+local function clearCrates()
+	for m,_ in pairs(crateButtons) do removeCrate(m) end
+end
+
+local function populateCratesAll()
+	clearCrates()
+	for _, inst in ipairs(workspace:GetDescendants()) do
+		if inst:IsA("Model") and inst.Name == "Military Crate" then
+			addCrate(inst)
+		end
+	end
+end
+
+local function disconnectCrateWatchers()
+	for _, c in ipairs(crateConns) do if c then c:Disconnect() end end
+	crateConns = {}
+end
+
+local function attachCrateWatchers()
+	disconnectCrateWatchers()
+	populateCratesAll()
+
+	table.insert(crateConns, workspace.DescendantAdded:Connect(function(inst)
+		if inst:IsA("Model") and inst.Name == "Military Crate" then
+			addCrate(inst)
+		end
+	end))
+	table.insert(crateConns, workspace.DescendantRemoving:Connect(function(inst)
+		if crateButtons[inst] then removeCrate(inst) end
+	end))
+
+	-- Light poll to catch rare renames to "Military Crate"
+	task.spawn(function()
+		while pageCrates.Parent do
+			for _, inst in ipairs(workspace:GetDescendants()) do
+				if inst:IsA("Model") and inst.Name == "Military Crate" then
+					if not crateButtons[inst] then addCrate(inst) end
+				end
+			end
+			task.wait(2.0)
+		end
+	end)
+end
+
+attachCrateWatchers()
+
+-- [Trash logic — only direct children named "Trash Can"]
+local function getHazardsRoot()
+	local env = workspace:FindFirstChild("Environment")
+	if not env then return nil end
+	local inter = env:FindFirstChild("Interactable")
+	if not inter then return nil end
+	return inter:FindFirstChild("Hazards")
+end
+
+local function tpToModelTrash(m)
+	if not m or not m:IsA("Model") then return end
+	local char = player.Character or player.CharacterAdded:Wait()
+	if not char then return end
+	local cf
+	local ok, pivot = pcall(function() return m:GetPivot() end)
+	if ok then cf = pivot
+	elseif m.PrimaryPart then cf = m.PrimaryPart.CFrame
+	else
+		local p = m:FindFirstChildWhichIsA("BasePart", true)
+		if p then cf = p.CFrame end
+	end
+	if not cf then return end
+	char:PivotTo(cf * CFrame.new(0, 4, 0))
+end
+
+local trashButtons   = {}  -- [Model] = TextButton
+local trashNameConn  = {}  -- [Model] = RBXScriptConnection
+local hazardsConns   = {}  -- { RBXScriptConnection }
+local observedHazards = nil
+
+local function removeTrashModel(m)
+	local b = trashButtons[m]
+	if b then b:Destroy() end
+	trashButtons[m] = nil
+	if trashNameConn[m] then trashNameConn[m]:Disconnect() trashNameConn[m] = nil end
+end
+
+local function addTrashModel(m)
+	-- Only accept models explicitly named "Trash Can"
+	if not (m and m:IsA("Model") and m.Name == "Trash Can") then return end
+	if trashButtons[m] then return end
+
+	local b = makeTrashButton(m.Name)
+	b.Parent = trashList
+	trashButtons[m] = b
+
+	b.MouseButton1Click:Connect(function()
+		tpToModelTrash(m)
+	end)
+
+	-- If it gets renamed away from "Trash Can", remove it from the list
+	trashNameConn[m] = m:GetPropertyChangedSignal("Name"):Connect(function()
+		if m.Name ~= "Trash Can" then
+			removeTrashModel(m)
+		else
+			local btn = trashButtons[m]
+			if btn then btn.Name = m.Name; btn.Text = m.Name end
+		end
+	end)
+end
+
+local function clearTrash()
+	for m,_ in pairs(trashButtons) do removeTrashModel(m) end
+end
+
+-- Populate ONLY direct children that are Models named "Trash Can"
+local function populateTrashDirect(root)
+	clearTrash()
+	if not root then return end
+	for _, child in ipairs(root:GetChildren()) do
+		addTrashModel(child)
+	end
+end
+
+local function disconnectHazardsWatch()
+	for _, c in ipairs(hazardsConns) do if c then c:Disconnect() end end
+	hazardsConns = {}
+	observedHazards = nil
+end
+
+local function attachHazardsWatch(root)
+	disconnectHazardsWatch()
+	if not root then return end
+	observedHazards = root
+
+	populateTrashDirect(root)
+
+	-- Only watch direct children (no descendants)
+	table.insert(hazardsConns, root.ChildAdded:Connect(function(inst)
+		addTrashModel(inst)
+	end))
+	table.insert(hazardsConns, root.ChildRemoved:Connect(function(inst)
+		if trashButtons[inst] then removeTrashModel(inst) end
+	end))
+	table.insert(hazardsConns, root.AncestryChanged:Connect(function(_, parent)
+		if not parent then disconnectHazardsWatch() end
+	end))
+end
+
+-- Rebind if Hazards is recreated; keeps list accurate
+task.spawn(function()
+	local last
+	while pageTrash.Parent do
+		local root = getHazardsRoot()
+		if root ~= last then
+			attachHazardsWatch(root)
+			last = root
+		end
+		task.wait(1.0)
+	end
+end)
+
+-- [Shop logic — direct children only]
+local function getVendorsRoot()
+	local env = workspace:FindFirstChild("Environment")
+	if not env then return nil end
+	return env:FindFirstChild("Vendors")
+end
+
+local function tpToModel(m)
+	if not m or not m:IsA("Model") then return end
+	local char = player.Character or player.CharacterAdded:Wait()
+	if not char then return end
+	local cf
+	local ok, pivot = pcall(function() return m:GetPivot() end)
+	if ok then
+		cf = pivot
+	elseif m.PrimaryPart then
+		cf = m.PrimaryPart.CFrame
+	else
+		local p = m:FindFirstChildWhichIsA("BasePart", true)
+		if p then cf = p.CFrame end
+	end
+	if not cf then return end
+	char:PivotTo(cf * CFrame.new(0, 4, 0))
+end
+
+-- Storage
+local shopButtons = {}          -- [Model] = TextButton
+local shopNameConn = {}         -- [Model] = RBXScriptConnection
+local vendorsConns = {}         -- { RBXScriptConnection }
+local observedVendors = nil
+
+local function addVendorModel(m)
+	if shopButtons[m] then return end
+	local b = makeShopButton(m.Name)
+	b.Parent = shopList
+	shopButtons[m] = b
+	b.MouseButton1Click:Connect(function() tpToModel(m) end)
+	shopNameConn[m] = m:GetPropertyChangedSignal("Name"):Connect(function()
+		b.Name = m.Name
+		b.Text = m.Name
+	end)
+end
+
+local function removeVendorModel(m)
+	local b = shopButtons[m]
+	if b then b:Destroy() end
+	shopButtons[m] = nil
+	if shopNameConn[m] then shopNameConn[m]:Disconnect() shopNameConn[m] = nil end
+end
+
+local function clearVendors()
+	for m,_ in pairs(shopButtons) do removeVendorModel(m) end
+end
+
+-- Populate ONLY direct children that are Models
+local function populateVendors(root)
+	clearVendors()
+	if not root then return end
+	for _, child in ipairs(root:GetChildren()) do
+		if child:IsA("Model") then
+			addVendorModel(child)
+		end
+	end
+end
+
+local function disconnectVendorsWatch()
+	for _, c in ipairs(vendorsConns) do if c then c:Disconnect() end end
+	vendorsConns = {}
+	observedVendors = nil
+end
+
+local function attachVendorsWatch(root)
+	disconnectVendorsWatch()
+	if not root then return end
+	observedVendors = root
+
+	populateVendors(root)
+
+	-- Only watch direct children (no descendants)
+	table.insert(vendorsConns, root.ChildAdded:Connect(function(inst)
+		if inst:IsA("Model") then addVendorModel(inst) end
+	end))
+	table.insert(vendorsConns, root.ChildRemoved:Connect(function(inst)
+		if shopButtons[inst] then removeVendorModel(inst) end
+	end))
+	table.insert(vendorsConns, root.AncestryChanged:Connect(function(_, parent)
+		if not parent then disconnectVendorsWatch() end
+	end))
+end
+
+-- Rebind if Vendors is recreated; keeps the list current
+task.spawn(function()
+	local last
+	while pageShop.Parent do
+		local root = getVendorsRoot()
+		if root ~= last then
+			attachVendorsWatch(root)
+			last = root
+		end
+		task.wait(1.0)
+	end
+end)
 
 -- Initial selection
 local currentIndex = 1
@@ -728,6 +1405,11 @@ end
 tabItems.MouseButton1Click:Connect(function() slideTo(1) end)
 tabAmmo.MouseButton1Click:Connect(function()  slideTo(2) end)
 tabMisc.MouseButton1Click:Connect(function()  slideTo(3) end)
+tabShop.MouseButton1Click:Connect(function() slideTo(4) end)
+
+-- Click bindings
+tabCrates.MouseButton1Click:Connect(function() slideTo(5) end)
+tabTrash.MouseButton1Click:Connect(function()  slideTo(6) end)
 
 ----------------------------------------------------------------------
 -- Dragging (drag the title bar; clicking tabs won't drag)
@@ -1002,6 +1684,9 @@ local function playStunningIntro()
 	if conn then conn:Disconnect() end
 	introGui:Destroy()
 	safeSetCoreAll(true)
+
+	-- Also call again right after your intro re-enables CoreGui:
+	disableBackpackPermanently()
 
 	-- Reveal the main GUI and arm the toggle
 	win.Visible = true
