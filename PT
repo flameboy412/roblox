@@ -1,0 +1,549 @@
+-- PT Hack :3 — Full build: cinematic full-screen intro + refined main GUI
+-- Persist across death + one-time intro SFX (rbxassetid://7112183471)
+
+local Players      = game:GetService("Players")
+local UIS          = game:GetService("UserInputService")
+local TweenService = game:GetService("TweenService")
+local RunService   = game:GetService("RunService")
+local StarterGui   = game:GetService("StarterGui")
+local SoundService = game:GetService("SoundService")
+
+local player    = Players.LocalPlayer
+local playerGui = player:WaitForChild("PlayerGui")
+
+-- Singleton guard: ensure UI is created only once per join/session
+if player:GetAttribute("PT_UI_INITIALIZED") then
+	-- UI was already built (and persists across death); nothing else to do.
+	return
+end
+player:SetAttribute("PT_UI_INITIALIZED", true)
+
+-- Theme
+local BG        = Color3.fromRGB(43, 18, 56)    -- deep purple
+local ACCENT    = Color3.fromRGB(66, 47, 88)    -- darker bar
+local TAB       = Color3.fromRGB(145, 59, 167)  -- tab idle
+local TAB_SEL   = Color3.fromRGB(170, 82, 205)  -- tab active
+local CYAN      = Color3.fromRGB(90, 220, 255)  -- neon accent
+local MAGENTA   = Color3.fromRGB(255, 105, 230) -- neon accent
+local WHITE     = Color3.new(1,1,1)
+
+-- Layout constants
+local PAD, TITLE_H, TABS_H, GAP, TAB_W, TAB_GAP = 14, 48, 36, 10, 132, 12
+
+-- Utilities
+local function corner(parent, r)
+	local c = Instance.new("UICorner")
+	c.CornerRadius = UDim.new(0, r or 12)
+	c.Parent = parent
+	return c
+end
+
+local function stroke(parent, color, thickness, transparency)
+	local s = Instance.new("UIStroke")
+	s.Color = color
+	s.Thickness = thickness or 1.25
+	s.Transparency = transparency or 0.35
+	s.ApplyStrokeMode = Enum.ApplyStrokeMode.Border
+	s.Parent = parent
+	return s
+end
+
+local function tween(obj, info, props)
+	local t = TweenService:Create(obj, info, props)
+	t:Play()
+	return t
+end
+
+----------------------------------------------------------------------
+-- ScreenGui for the main app (persists across respawn)
+----------------------------------------------------------------------
+local gui = Instance.new("ScreenGui")
+gui.Name = "PT Hack :3"
+gui.ResetOnSpawn = false       -- IMPORTANT: keep GUI through death/respawn
+gui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
+pcall(function()
+	gui.ClipToDeviceSafeArea = true
+	gui.ScreenInsets = Enum.ScreenInsets.CoreUISafeInsets
+end)
+gui.Parent = playerGui
+
+----------------------------------------------------------------------
+-- Window shell (centered, aligned)
+----------------------------------------------------------------------
+local win = Instance.new("Frame")
+win.Name = "MainFrame"
+win.AnchorPoint = Vector2.new(0.5, 0.5)
+win.Position = UDim2.new(0.5, 0, 0.5, 0)
+win.Size = UDim2.new(0, 560, 0, 360)
+win.BackgroundColor3 = BG
+win.BorderSizePixel = 0
+win.Visible = false -- revealed after intro
+win.Parent = gui
+corner(win, 14)
+stroke(win, Color3.fromRGB(200,120,255), 1.2, 0.5)
+
+-- Inner container for consistent spacing
+local container = Instance.new("Frame")
+container.BackgroundTransparency = 1
+container.Size = UDim2.new(1, -PAD*2, 1, -PAD*2)
+container.Position = UDim2.new(0, PAD, 0, PAD)
+container.Parent = win
+
+----------------------------------------------------------------------
+-- Title bar (draggable)
+----------------------------------------------------------------------
+local titleBar = Instance.new("Frame")
+titleBar.Name = "TitleBar"
+titleBar.BackgroundColor3 = ACCENT
+titleBar.BorderSizePixel = 0
+titleBar.Size = UDim2.new(1, 0, 0, 48)
+titleBar.Active = true
+titleBar.Parent = container
+corner(titleBar, 10)
+stroke(titleBar, Color3.fromRGB(255,160,255), 1, 0.6)
+
+local title = Instance.new("TextLabel")
+title.BackgroundTransparency = 1
+title.Text = "PT Hack :3"
+title.Font = Enum.Font.GothamBold
+title.TextSize = 18
+title.TextColor3 = WHITE
+title.TextXAlignment = Enum.TextXAlignment.Left
+title.Size = UDim2.new(1, -PAD*2, 1, 0)
+title.Position = UDim2.new(0, PAD, 0, 0)
+title.Parent = titleBar
+
+----------------------------------------------------------------------
+-- Tabs row (centered with UIListLayout)
+----------------------------------------------------------------------
+local tabsStrip = Instance.new("Frame")
+tabsStrip.Name = "TabsStrip"
+tabsStrip.BackgroundTransparency = 1
+tabsStrip.Size = UDim2.new(1, 0, 0, TABS_H)
+tabsStrip.Position = UDim2.new(0, 0, 0, TITLE_H + GAP)
+tabsStrip.Parent = container
+
+local tabsLayout = Instance.new("UIListLayout")
+tabsLayout.FillDirection = Enum.FillDirection.Horizontal
+tabsLayout.HorizontalAlignment = Enum.HorizontalAlignment.Center
+tabsLayout.VerticalAlignment = Enum.VerticalAlignment.Center
+tabsLayout.SortOrder = Enum.SortOrder.LayoutOrder
+tabsLayout.Padding = UDim.new(0, TAB_GAP)
+tabsLayout.Parent = tabsStrip
+
+local function makeTab(label, order)
+	local b = Instance.new("TextButton")
+	b.Name = label
+	b.LayoutOrder = order
+	b.Text = label
+	b.Font = Enum.Font.GothamBold
+	b.TextSize = 14
+	b.TextColor3 = WHITE
+	b.AutoButtonColor = false
+	b.BackgroundColor3 = TAB
+	b.BorderSizePixel = 0
+	b.Size = UDim2.new(0, TAB_W, 1, 0)
+	b.Parent = tabsStrip
+	corner(b, 8)
+	stroke(b, TAB_SEL, 1, 0.75)
+
+	-- Per-tab underline indicator
+	local underline = Instance.new("Frame")
+	underline.Name = "Underline"
+	underline.AnchorPoint = Vector2.new(0.5, 1)
+	underline.Position = UDim2.new(0.5, 0, 1, 3)
+	underline.Size = UDim2.new(0, 0, 0, 3)
+	underline.BackgroundColor3 = WHITE
+	underline.BorderSizePixel = 0
+	underline.Parent = b
+	local ug = Instance.new("UIGradient")
+	ug.Color = ColorSequence.new{
+		ColorSequenceKeypoint.new(0, MAGENTA),
+		ColorSequenceKeypoint.new(1, CYAN)
+	}
+	ug.Parent = underline
+	corner(underline, 3)
+
+	b.MouseEnter:Connect(function()
+		tween(b, TweenInfo.new(0.15), {BackgroundColor3 = TAB_SEL})
+	end)
+	b.MouseLeave:Connect(function() end)
+
+	return b
+end
+
+local tabItems = makeTab("Items", 1)
+local tabAmmo  = makeTab("Ammo",  2)
+local tabMisc  = makeTab("Misc",  3)
+local tabList  = {tabItems, tabAmmo, tabMisc}
+
+----------------------------------------------------------------------
+-- Content area fills remaining space
+----------------------------------------------------------------------
+local contentTop = TITLE_H + GAP + TABS_H + GAP
+local pages = Instance.new("Frame")
+pages.Name = "Pages"
+pages.BackgroundColor3 = Color3.fromRGB(30, 12, 40)
+pages.BackgroundTransparency = 0.05
+pages.Position = UDim2.new(0, 0, 0, contentTop)
+pages.Size = UDim2.new(1, 0, 1, -contentTop)
+pages.ClipsDescendants = true
+pages.Parent = container
+corner(pages, 10)
+stroke(pages, Color3.fromRGB(210,120,255), 1, 0.6)
+
+local pagesGrad = Instance.new("UIGradient")
+pagesGrad.Rotation = 45
+pagesGrad.Color = ColorSequence.new{
+	ColorSequenceKeypoint.new(0.00, Color3.fromRGB(55,26,75)),
+	ColorSequenceKeypoint.new(0.60, Color3.fromRGB(43,18,56)),
+	ColorSequenceKeypoint.new(1.00, Color3.fromRGB(35,14,47)),
+}
+pagesGrad.Parent = pages
+
+-- Empty pages for tabs
+local function makePage(name)
+	local f = Instance.new("Frame")
+	f.Name = name
+	f.BackgroundTransparency = 1
+	f.BorderSizePixel = 0
+	f.Size = UDim2.new(1, 0, 1, 0)
+	f.Visible = false
+	f.Parent = pages
+	return f
+end
+local pageItems = makePage("ItemsPage")
+local pageAmmo  = makePage("AmmoPage")
+local pageMisc  = makePage("MiscPage")
+local pageList  = {pageItems, pageAmmo, pageMisc}
+
+-- Initial selection
+local currentIndex = 1
+pageList[currentIndex].Visible = true
+pageList[currentIndex].Position = UDim2.new(0,0,0,0)
+
+-- Update tab visuals (color + underline)
+local function setTabVisual(activeIndex)
+	for i, b in ipairs(tabList) do
+		local isActive = (i == activeIndex)
+		local bg = isActive and TAB_SEL or TAB
+		tween(b, TweenInfo.new(0.15), {BackgroundColor3 = bg})
+		local u = b:FindFirstChild("Underline")
+		if u then
+			if isActive then
+				tween(u, TweenInfo.new(0.20, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {Size = UDim2.new(1, 0, 0, 3)})
+			else
+				tween(u, TweenInfo.new(0.18, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {Size = UDim2.new(0, 0, 0, 3)})
+			end
+		end
+	end
+	tween(win, TweenInfo.new(0.2), {BackgroundColor3 = BG})
+end
+setTabVisual(currentIndex)
+
+-- Directional swipe transition
+local function slideTo(targetIndex)
+	if targetIndex == currentIndex then
+		setTabVisual(currentIndex)
+		return
+	end
+	local oldPage = pageList[currentIndex]
+	local newPage = pageList[targetIndex]
+	local goingRight = targetIndex > currentIndex
+	local incomingX = goingRight and -1 or 1
+	local outgoingX = goingRight and  1 or -1
+
+	newPage.Visible = true
+	newPage.Position = UDim2.new(incomingX,0,0,0)
+
+	local info = TweenInfo.new(0.28, Enum.EasingStyle.Quad, Enum.EasingDirection.Out)
+	local tIn  = tween(newPage, info, {Position = UDim2.new(0,0,0,0)})
+	local tOut = tween(oldPage, info, {Position = UDim2.new(outgoingX,0,0,0)})
+	tIn.Completed:Wait()
+
+	oldPage.Visible = false
+	oldPage.Position = UDim2.new(0,0,0,0)
+	currentIndex = targetIndex
+	setTabVisual(currentIndex)
+end
+
+-- Hook tabs
+tabItems.MouseButton1Click:Connect(function() slideTo(1) end)
+tabAmmo.MouseButton1Click:Connect(function()  slideTo(2) end)
+tabMisc.MouseButton1Click:Connect(function()  slideTo(3) end)
+
+----------------------------------------------------------------------
+-- Dragging (drag the title bar; clicking tabs won't drag)
+----------------------------------------------------------------------
+local dragging, dragStart, startPos, dragInput
+local function pointIn(obj, p)
+	local pos, size = obj.AbsolutePosition, obj.AbsoluteSize
+	return p.X >= pos.X and p.X <= pos.X + size.X and p.Y >= pos.Y and p.Y <= pos.Y + size.Y
+end
+
+titleBar.InputBegan:Connect(function(input)
+	if input.UserInputType ~= Enum.UserInputType.MouseButton1 and input.UserInputType ~= Enum.UserInputType.Touch then
+		return
+	end
+	for _, child in ipairs(tabsStrip:GetChildren()) do
+		if child:IsA("GuiButton") and pointIn(child, input.Position) then
+			return
+		end
+	end
+	dragging = true
+	dragStart = input.Position
+	startPos = win.Position
+	input.Changed:Connect(function()
+		if input.UserInputState == Enum.UserInputState.End then dragging = false end
+	end)
+end)
+
+titleBar.InputChanged:Connect(function(input)
+	if input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch then
+		dragInput = input
+	end
+end)
+
+UIS.InputChanged:Connect(function(input)
+	if input == dragInput and dragging then
+		local delta = input.Position - dragStart
+		win.Position = UDim2.new(startPos.X.Scale, startPos.X.Offset + delta.X, startPos.Y.Scale, startPos.Y.Offset + delta.Y)
+	end
+end)
+
+----------------------------------------------------------------------
+-- Left Control: modern zoom-fade toggle (minimize/restore)
+----------------------------------------------------------------------
+local scale = Instance.new("UIScale")
+scale.Scale = 1
+scale.Parent = win
+
+local fader = Instance.new("Frame")
+fader.BackgroundColor3 = Color3.fromRGB(18, 6, 28)
+fader.BackgroundTransparency = 1
+fader.BorderSizePixel = 0
+fader.Size = UDim2.fromScale(1,1)
+fader.ZIndex = 999
+fader.Parent = win
+corner(fader, 14)
+
+local homePos = win.Position
+local isOpen, animLock, windowReady = false, false, false
+
+local function openWindow()
+	if animLock or isOpen or not windowReady then return end
+	animLock = true
+	win.Visible = true
+	scale.Scale = 0.96
+	fader.BackgroundTransparency = 0
+	win.Position = homePos + UDim2.fromOffset(0, 8)
+
+	tween(fader, TweenInfo.new(0.28, Enum.EasingStyle.Sine, Enum.EasingDirection.Out), {BackgroundTransparency = 1})
+	tween(win,   TweenInfo.new(0.26, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {Position = homePos})
+	local up = tween(scale, TweenInfo.new(0.16, Enum.EasingStyle.Quint, Enum.EasingDirection.Out), {Scale = 1.03})
+	up.Completed:Wait()
+	tween(scale, TweenInfo.new(0.12, Enum.EasingStyle.Sine, Enum.EasingDirection.In), {Scale = 1})
+
+	isOpen, animLock = true, false
+end
+
+local function closeWindow()
+	if animLock or not isOpen or not windowReady then return end
+	animLock = true
+	tween(fader, TweenInfo.new(0.20, Enum.EasingStyle.Sine, Enum.EasingDirection.In), {BackgroundTransparency = 0})
+	tween(win,   TweenInfo.new(0.24, Enum.EasingStyle.Quad, Enum.EasingDirection.In), {Position = homePos + UDim2.fromOffset(0, 8)})
+	local down = tween(scale, TweenInfo.new(0.24, Enum.EasingStyle.Quint, Enum.EasingDirection.In), {Scale = 0.94})
+	down.Completed:Wait()
+	win.Visible = false
+	isOpen, animLock = false, false
+end
+
+local function toggleWindow()
+	if not windowReady then return end
+	if isOpen then closeWindow() else openWindow() end
+end
+
+UIS.InputBegan:Connect(function(input, processed)
+	if processed then return end
+	if input.KeyCode == Enum.KeyCode.LeftControl then
+		toggleWindow()
+	end
+end)
+
+----------------------------------------------------------------------
+-- Full-screen cinematic intro (covers CoreGui). Includes one-time SFX.
+----------------------------------------------------------------------
+local function safeSetCoreAll(enabled)
+	for i = 1, 40 do
+		local ok1 = pcall(function() StarterGui:SetCoreGuiEnabled(Enum.CoreGuiType.All, enabled) end)
+		local ok2 = pcall(function() StarterGui:SetCore("TopbarEnabled", enabled) end)
+		if ok1 and ok2 then return end
+		task.wait(0.1)
+	end
+end
+
+local function playStunningIntro()
+	local introGui = Instance.new("ScreenGui")
+	introGui.Name = "PT_Intro"
+	introGui.IgnoreGuiInset = true         -- fill the entire screen
+	introGui.ResetOnSpawn = false
+	introGui.DisplayOrder = 1_000_000     -- absolutely on top
+	introGui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
+	introGui.Parent = playerGui
+
+	-- Disable Roblox CoreGui so nothing sits above the intro
+	safeSetCoreAll(false)
+
+	-- Play one-time intro SFX
+	local sfx = Instance.new("Sound")
+	sfx.SoundId = "rbxassetid://7112183471"
+	sfx.Volume = 0.7
+	sfx.RollOffMode = Enum.RollOffMode.Linear -- 2D UI sound via SoundService
+	sfx.Parent = SoundService
+	sfx:Play()
+	sfx.Ended:Connect(function() sfx:Destroy() end)
+
+	local overlay = Instance.new("Frame")
+	overlay.Name = "CinematicOverlay"
+	overlay.BackgroundColor3 = BG
+	overlay.Size = UDim2.fromScale(1, 1)
+	overlay.ZIndex = 100
+	overlay.ClipsDescendants = true
+	overlay.Parent = introGui
+
+	-- Vignette
+	local vignette = Instance.new("Frame")
+	vignette.BackgroundTransparency = 1
+	vignette.Size = UDim2.fromScale(1, 1)
+	vignette.ZIndex = 102
+	vignette.Parent = overlay
+	local vigGrad = Instance.new("UIGradient")
+	vigGrad.Color = ColorSequence.new{
+		ColorSequenceKeypoint.new(0.00, Color3.fromRGB(30, 12, 45)),
+		ColorSequenceKeypoint.new(0.60, Color3.fromRGB(30, 12, 45)),
+		ColorSequenceKeypoint.new(1.00, Color3.fromRGB(15, 5, 25))
+	}
+	vigGrad.Rotation = 90
+	vigGrad.Parent = vignette
+
+	-- Parallax stars
+	local starRoot = Instance.new("Frame")
+	starRoot.BackgroundTransparency = 1
+	starRoot.Size = UDim2.fromScale(1,1)
+	starRoot.ZIndex = 103
+	starRoot.Parent = overlay
+
+	local layers = {
+		{count = 120, speed = 10,  size = Vector2.new(2,2), alpha = 0.45},
+		{count = 70,  speed = 25,  size = Vector2.new(3,3), alpha = 0.55},
+		{count = 28,  speed = 55,  size = Vector2.new(4,4), alpha = 0.70},
+	}
+	local movers = {}
+	local function makeStar(parent, sz, a)
+		local s = Instance.new("Frame")
+		s.BackgroundColor3 = WHITE
+		s.BackgroundTransparency = 1 - a
+		s.Size = UDim2.fromOffset(sz.X, sz.Y)
+		s.Position = UDim2.fromScale(math.random(), math.random())
+		s.ZIndex = 103
+		s.Parent = parent
+		local glow = Instance.new("Frame")
+		glow.AnchorPoint = Vector2.new(0.5, 0.5)
+		glow.Position = UDim2.fromScale(0.5, 0.5)
+		glow.Size = UDim2.fromOffset(sz.X*3, sz.Y*3)
+		glow.BackgroundColor3 = MAGENTA:Lerp(CYAN, math.random())
+		glow.BackgroundTransparency = 0.82
+		glow.Parent = s
+		corner(glow, math.max(sz.X, sz.Y))
+		corner(s, math.max(2, math.max(sz.X, sz.Y)))
+		return s
+	end
+	for _, l in ipairs(layers) do
+		for i=1, l.count do
+			local s = makeStar(starRoot, l.size, l.alpha)
+			table.insert(movers, {s = s, speed = l.speed})
+		end
+	end
+	local conn = RunService.RenderStepped:Connect(function(dt)
+		for _, m in ipairs(movers) do
+			local p = m.s.Position
+			local x = p.X.Scale + (m.speed * dt)/100
+			local y = p.Y.Scale + (m.speed * dt)/300
+			if x > 1.1 then x = -0.1 end
+			if y > 1.1 then y = -0.1 end
+			m.s.Position = UDim2.fromScale(x, y)
+		end
+	end)
+
+	-- Shooting streaks
+	local streakRoot = Instance.new("Frame")
+	streakRoot.BackgroundTransparency = 1
+	streakRoot.Size = UDim2.fromScale(1,1)
+	streakRoot.ZIndex = 104
+	streakRoot.Parent = overlay
+	local function spawnStreak()
+		local st = Instance.new("Frame")
+		st.BackgroundColor3 = CYAN:Lerp(MAGENTA, math.random())
+		st.BackgroundTransparency = 0.15
+		st.Size = UDim2.fromOffset(math.random(120, 220), 2)
+		st.AnchorPoint = Vector2.new(0.5, 0.5)
+		local y = math.random()
+		st.Position = UDim2.fromScale(-0.1, y)
+		st.Rotation = -10 + math.random(-6, 6)
+		st.Parent = streakRoot
+		local g = Instance.new("UIGradient")
+		g.Color = ColorSequence.new{
+			ColorSequenceKeypoint.new(0, WHITE),
+			ColorSequenceKeypoint.new(0.3, WHITE),
+			ColorSequenceKeypoint.new(1, WHITE)
+		}
+		g.Transparency = NumberSequence.new{
+			NumberSequenceKeypoint.new(0, 1),
+			NumberSequenceKeypoint.new(0.15, 0.3),
+			NumberSequenceKeypoint.new(0.85, 0.3),
+			NumberSequenceKeypoint.new(1, 1)
+		}
+		g.Parent = st
+		tween(st, TweenInfo.new(0.9, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {Position = UDim2.fromScale(1.2, y)}).Completed:Wait()
+		st:Destroy()
+	end
+	task.spawn(function()
+		while overlay.Parent do
+			spawnStreak()
+			task.wait(math.random(12, 22)/100)
+		end
+	end)
+
+	-- Splash image (rounded)
+	local splash = Instance.new("ImageLabel")
+	splash.Name = "SplashImage"
+	splash.BackgroundTransparency = 1
+	splash.AnchorPoint = Vector2.new(0.5, 0.5)
+ 	splash.Position = UDim2.fromScale(0.5, 0.5)
+	splash.Size = UDim2.fromOffset(220, 140)
+	splash.Image = "rbxassetid://127277196439432"
+	splash.ScaleType = Enum.ScaleType.Fit
+	splash.ZIndex = 110
+	splash.Parent = overlay
+	corner(splash, 16)
+
+	-- Timings: expand 3.5s; shrink extended 2.0s; fade 1.0s
+	local EXPAND_TIME, SHRINK_TIME, FADE_TIME = 3.5, 2.0, 1.0
+
+	tween(splash, TweenInfo.new(EXPAND_TIME, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {Size = UDim2.fromScale(1,1)}).Completed:Wait()
+	tween(splash, TweenInfo.new(SHRINK_TIME, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {Size = UDim2.fromOffset(280,175)}).Completed:Wait()
+	tween(splash, TweenInfo.new(FADE_TIME), {ImageTransparency = 1}).Completed:Wait()
+
+	if conn then conn:Disconnect() end
+	introGui:Destroy()
+	safeSetCoreAll(true)
+
+	-- Reveal the main GUI and arm the toggle
+	win.Visible = true
+	homePos = win.Position
+	isOpen = true
+	windowReady = true
+end
+
+-- Run the intro (sound plays once here)
+playStunningIntro()
