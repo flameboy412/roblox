@@ -728,6 +728,45 @@ miscContainer.Size = UDim2.new(1, -16, 1, -16)
 miscContainer.Position = UDim2.new(0, 8, 0, 8)
 miscContainer.Parent = pageMisc
 
+-- [Misc UI] No ragdoll toggle row
+local rowRag = Instance.new("Frame")
+rowRag.BackgroundTransparency = 1
+rowRag.Size = UDim2.new(1, 0, 0, 36)
+rowRag.Parent = miscContainer
+
+local ragLabel = Instance.new("TextLabel")
+ragLabel.BackgroundTransparency = 1
+ragLabel.Text = "No ragdoll"
+ragLabel.Font = Enum.Font.GothamBold
+ragLabel.TextSize = 16
+ragLabel.TextColor3 = Color3.new(1,1,1)
+ragLabel.TextXAlignment = Enum.TextXAlignment.Left
+ragLabel.Size = UDim2.new(1, -120, 1, 0)
+ragLabel.Parent = rowRag
+
+local ragSwitch = Instance.new("TextButton")
+ragSwitch.Name = "NoRagdollSwitch"
+ragSwitch.AutoButtonColor = false
+ragSwitch.Text = ""
+ragSwitch.AnchorPoint = Vector2.new(1, 0.5)
+ragSwitch.Position = UDim2.new(1, 0, 0.5, 0)
+ragSwitch.Size = UDim2.new(0, 64, 0, 28)
+ragSwitch.BackgroundColor3 = Color3.fromRGB(66, 47, 88) -- off
+ragSwitch.BorderSizePixel = 0
+ragSwitch.Parent = rowRag
+local rgCorner = Instance.new("UICorner", ragSwitch) rgCorner.CornerRadius = UDim.new(1, 0)
+local rgStroke = Instance.new("UIStroke", ragSwitch) rgStroke.Color = Color3.fromRGB(170, 82, 205) rgStroke.Transparency = 0.4
+
+local ragKnob = Instance.new("Frame")
+ragKnob.Name = "Knob"
+ragKnob.AnchorPoint = Vector2.new(0, 0.5)
+ragKnob.Position = UDim2.new(0, 3, 0.5, 0)
+ragKnob.Size = UDim2.new(0, 24, 0, 24)
+ragKnob.BackgroundColor3 = Color3.fromRGB(145, 59, 167)
+ragKnob.BorderSizePixel = 0
+ragKnob.Parent = ragSwitch
+local rkCorner = Instance.new("UICorner", ragKnob) rkCorner.CornerRadius = UDim.new(1, 0)
+
 local miscLayout = Instance.new("UIListLayout")
 miscLayout.Padding = UDim.new(0, 10)
 miscLayout.SortOrder = Enum.SortOrder.LayoutOrder
@@ -909,6 +948,138 @@ end
 setInfEnabled(infEnabled or false)
 switch.MouseButton1Click:Connect(function()
 	setInfEnabled(not infEnabled)
+end)
+
+-- [Misc logic] No ragdoll toggle implementation
+local CollectionService = game:GetService("CollectionService")
+local RunService        = game:GetService("RunService")
+
+-- Visuals for the pill switch
+local function setRagSwitchVisual(isOn: boolean)
+	if isOn then
+		ragSwitch.BackgroundColor3 = Color3.fromRGB(90, 220, 255)  -- cyan ON
+		ragKnob:TweenPosition(UDim2.new(1, -27, 0.5, 0), Enum.EasingDirection.Out, Enum.EasingStyle.Quad, 0.15, true)
+		ragKnob.BackgroundColor3 = Color3.fromRGB(255, 105, 230)   -- magenta knob
+	else
+		ragSwitch.BackgroundColor3 = Color3.fromRGB(66, 47, 88)    -- OFF
+		ragKnob:TweenPosition(UDim2.new(0, 3, 0.5, 0), Enum.EasingDirection.Out, Enum.EasingStyle.Quad, 0.15, true)
+		ragKnob.BackgroundColor3 = Color3.fromRGB(145, 59, 167)
+	end
+end
+
+-- Helpers
+local function getCharHum()
+	local char = player.Character or player.CharacterAdded:Wait()
+	local hum = char:FindFirstChildOfClass("Humanoid")
+	return char, hum
+end
+
+local function disableRagdollConstraints(char)
+	local rc = char:FindFirstChild("RagdollConstraints")
+	if not rc then return end
+	for _, inst in ipairs(rc:GetChildren()) do
+		if inst:IsA("Constraint") then inst.Enabled = false end
+	end
+end
+
+-- State + connections
+local ATTR_NO_RAG = "PT_NoRagdoll"
+local noRagEnabled = player:GetAttribute(ATTR_NO_RAG) == true
+
+local humStateConn: RBXScriptConnection?
+local rcChildConn:  RBXScriptConnection?
+local tagAddedConn: RBXScriptConnection?
+local charAddedConn: RBXScriptConnection?
+local currentHum: Humanoid?
+local hadRagdollTagThisChar = false
+
+local function startNoRagdollFor(char, hum)
+	currentHum = hum
+	if not (char and hum) then return end
+
+	-- Remember if game had tagged us; we can re-add on disable
+	hadRagdollTagThisChar = CollectionService:HasTag(hum, "Ragdoll")
+	if hadRagdollTagThisChar then
+		CollectionService:RemoveTag(hum, "Ragdoll")
+	end
+
+	-- Prevent future Ragdoll tags on our humanoid
+	if tagAddedConn then tagAddedConn:Disconnect() end
+	tagAddedConn = CollectionService:GetInstanceAddedSignal("Ragdoll"):Connect(function(obj)
+		if not noRagEnabled then return end
+		if obj == hum then
+			CollectionService:RemoveTag(hum, "Ragdoll")
+		end
+	end)
+
+	-- Disable Physics state attempts (client-side)
+	pcall(function() hum:SetStateEnabled(Enum.HumanoidStateType.Physics, false) end)
+
+	if humStateConn then humStateConn:Disconnect() end
+	humStateConn = hum.StateChanged:Connect(function(_, newState)
+		if not noRagEnabled then return end
+		if newState == Enum.HumanoidStateType.Physics and hum.Health > 0 then
+			-- Immediately stand back up
+			hum:ChangeState(Enum.HumanoidStateType.GettingUp)
+		end
+	end)
+
+	-- Keep constraints disabled
+	disableRagdollConstraints(char)
+	local rc = char:FindFirstChild("RagdollConstraints")
+	if rc then
+		if rcChildConn then rcChildConn:Disconnect() end
+		rcChildConn = rc.ChildAdded:Connect(function(inst)
+			if not noRagEnabled then return end
+			if inst:IsA("Constraint") then inst.Enabled = false end
+		end)
+	end
+end
+
+local function stopNoRagdoll()
+	-- Restore listeners/state
+	if humStateConn then humStateConn:Disconnect() humStateConn = nil end
+	if rcChildConn  then rcChildConn:Disconnect()  rcChildConn  = nil end
+	if tagAddedConn then tagAddedConn:Disconnect() tagAddedConn = nil end
+
+	local hum = currentHum
+	currentHum = nil
+	if hum then
+		pcall(function() hum:SetStateEnabled(Enum.HumanoidStateType.Physics, true) end)
+		-- Optionally re-add tag if the character had it originally
+		if hadRagdollTagThisChar then
+			pcall(function() CollectionService:AddTag(hum, "Ragdoll") end)
+		end
+	end
+	hadRagdollTagThisChar = false
+end
+
+local function setNoRagdollEnabled(on: boolean)
+	noRagEnabled = on
+	player:SetAttribute(ATTR_NO_RAG, on)
+	setRagSwitchVisual(on)
+
+	if on then
+		local char, hum = getCharHum()
+		startNoRagdollFor(char, hum)
+		if charAddedConn then charAddedConn:Disconnect() end
+		charAddedConn = player.CharacterAdded:Connect(function(newChar)
+			-- Re-apply every respawn
+			local newHum = newChar:WaitForChild("Humanoid", 5)
+			if newHum then
+				startNoRagdollFor(newChar, newHum)
+			end
+		end)
+	else
+		stopNoRagdoll()
+		if charAddedConn then charAddedConn:Disconnect() charAddedConn = nil end
+	end
+end
+
+-- Initialize and wire
+setNoRagdollEnabled(noRagEnabled or false)
+ragSwitch.MouseButton1Click:Connect(function()
+	setNoRagdollEnabled(not noRagEnabled)
 end)
 
 local pageShop  = makePage("ShopPage")
