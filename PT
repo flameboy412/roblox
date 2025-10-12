@@ -736,7 +736,7 @@ rowRag.Parent = miscContainer
 
 local ragLabel = Instance.new("TextLabel")
 ragLabel.BackgroundTransparency = 1
-ragLabel.Text = "No ragdoll"
+ragLabel.Text = "No ragdoll (No Fall)"
 ragLabel.Font = Enum.Font.GothamBold
 ragLabel.TextSize = 16
 ragLabel.TextColor3 = Color3.new(1,1,1)
@@ -811,6 +811,65 @@ knob.BackgroundColor3 = Color3.fromRGB(145, 59, 167)
 knob.BorderSizePixel = 0
 knob.Parent = switch
 local kCorner = Instance.new("UICorner", knob) kCorner.CornerRadius = UDim.new(1, 0)
+
+-- [Misc UI] Kill all bots button + Paralyze all bots toggle
+-- 1) Button: Kill all bots
+local killBotsBtn = Instance.new("TextButton")
+killBotsBtn.Name = "KillAllBotsButton"
+killBotsBtn.Text = "Kill all bots"
+killBotsBtn.AutoButtonColor = false
+killBotsBtn.Font = Enum.Font.GothamBold
+killBotsBtn.TextSize = 14
+killBotsBtn.TextColor3 = Color3.new(1,1,1)
+killBotsBtn.BackgroundColor3 = Color3.fromRGB(145, 59, 167)
+killBotsBtn.BorderSizePixel = 0
+killBotsBtn.Size = UDim2.new(0, 220, 0, 32)
+killBotsBtn.Parent = miscContainer
+do
+	local c = Instance.new("UICorner", killBotsBtn) c.CornerRadius = UDim.new(0, 8)
+	local s = Instance.new("UIStroke", killBotsBtn) s.Color = Color3.fromRGB(170, 82, 205) s.Transparency = 0.55
+	killBotsBtn.MouseEnter:Connect(function() killBotsBtn.BackgroundColor3 = Color3.fromRGB(170, 82, 205) s.Transparency = 0.35 end)
+	killBotsBtn.MouseLeave:Connect(function() killBotsBtn.BackgroundColor3 = Color3.fromRGB(145, 59, 167) s.Transparency = 0.55 end)
+end
+
+-- 2) Toggle row: Paralyze all bots
+local parRow = Instance.new("Frame")
+parRow.BackgroundTransparency = 1
+parRow.Size = UDim2.new(1, 0, 0, 36)
+parRow.Parent = miscContainer
+
+local parLabel = Instance.new("TextLabel")
+parLabel.BackgroundTransparency = 1
+parLabel.Text = "Paralyze all bots"
+parLabel.Font = Enum.Font.GothamBold
+parLabel.TextSize = 16
+parLabel.TextColor3 = Color3.new(1,1,1)
+parLabel.TextXAlignment = Enum.TextXAlignment.Left
+parLabel.Size = UDim2.new(1, -120, 1, 0)
+parLabel.Parent = parRow
+
+local parSwitch = Instance.new("TextButton")
+parSwitch.Name = "ParalyzeBotsSwitch"
+parSwitch.AutoButtonColor = false
+parSwitch.Text = ""
+parSwitch.AnchorPoint = Vector2.new(1, 0.5)
+parSwitch.Position = UDim2.new(1, 0, 0.5, 0)
+parSwitch.Size = UDim2.new(0, 64, 0, 28)
+parSwitch.BackgroundColor3 = Color3.fromRGB(66, 47, 88) -- OFF
+parSwitch.BorderSizePixel = 0
+parSwitch.Parent = parRow
+local psCorner = Instance.new("UICorner", parSwitch) psCorner.CornerRadius = UDim.new(1, 0)
+local psStroke = Instance.new("UIStroke", parSwitch) psStroke.Color = Color3.fromRGB(170, 82, 205) psStroke.Transparency = 0.4
+
+local parKnob = Instance.new("Frame")
+parKnob.Name = "Knob"
+parKnob.AnchorPoint = Vector2.new(0, 0.5)
+parKnob.Position = UDim2.new(0, 3, 0.5, 0)
+parKnob.Size = UDim2.new(0, 24, 0, 24)
+parKnob.BackgroundColor3 = Color3.fromRGB(145, 59, 167)
+parKnob.BorderSizePixel = 0
+parKnob.Parent = parSwitch
+local pkCorner = Instance.new("UICorner", parKnob) pkCorner.CornerRadius = UDim.new(1, 0)
 
 -- [Misc logic — SAFE Infinite Stamina toggle that won't break the UI]
 
@@ -1081,6 +1140,124 @@ setNoRagdollEnabled(noRagEnabled or false)
 ragSwitch.MouseButton1Click:Connect(function()
 	setNoRagdollEnabled(not noRagEnabled)
 end)
+
+-- [Misc logic] Kill all bots + Paralyze all bots
+do
+	-- Bot management module to reduce local variable count
+	local function botsFolder()
+		return workspace:FindFirstChild("Characters")
+	end
+	local function forEachBotHumanoid(cb)
+		local folder = botsFolder()
+		if not folder then return end
+		for _, child in ipairs(folder:GetChildren()) do
+			if child:IsA("Model") and child.Name == "Bot" then
+				local hum = child:FindFirstChildOfClass("Humanoid")
+				if hum then cb(child, hum) end
+			end
+		end
+	end
+
+	-- Kill all bots function
+	local function killAllBots()
+		forEachBotHumanoid(function(_, hum)
+			pcall(function() hum.Health = 0 end)
+		end)
+	end
+	killBotsBtn.MouseButton1Click:Connect(killAllBots)
+
+	-- Paralyze system
+	local function setParSwitchVisual(isOn)
+		if isOn then
+			parSwitch.BackgroundColor3 = Color3.fromRGB(90, 220, 255)
+			parKnob:TweenPosition(UDim2.new(1, -27, 0.5, 0), Enum.EasingDirection.Out, Enum.EasingStyle.Quad, 0.15, true)
+			parKnob.BackgroundColor3 = Color3.fromRGB(255, 105, 230)
+		else
+			parSwitch.BackgroundColor3 = Color3.fromRGB(66, 47, 88)
+			parKnob:TweenPosition(UDim2.new(0, 3, 0.5, 0), Enum.EasingDirection.Out, Enum.EasingStyle.Quad, 0.15, true)
+			parKnob.BackgroundColor3 = Color3.fromRGB(145, 59, 167)
+		end
+	end
+
+	local ATTR_PARALYZE = "PT_ParalyzeAllBots"
+	local parEnabled = player:GetAttribute(ATTR_PARALYZE) == true
+	local original = {}
+	local childAddedConn, childRemovedConn
+
+	local function applyParalyzeTo(hum)
+		if not original[hum] then
+			original[hum] = { speed = hum.WalkSpeed, wasSitting = hum.Sit }
+		end
+		pcall(function()
+			hum.Sit = true
+			hum.WalkSpeed = 0
+		end)
+	end
+
+	local function revertParalyzeFrom(hum)
+		local snap = original[hum]
+		pcall(function()
+			if snap then
+				hum.WalkSpeed = typeof(snap.speed) == "number" and snap.speed or 16
+				hum.Sit = snap.wasSitting and true or false
+			else
+				hum.WalkSpeed = 16
+				hum.Sit = false
+			end
+		end)
+		original[hum] = nil
+	end
+
+	local function startParalyze()
+		forEachBotHumanoid(function(_, hum) applyParalyzeTo(hum) end)
+		local folder = botsFolder()
+		if not folder then return end
+
+		if childAddedConn then childAddedConn:Disconnect() end
+		if childRemovedConn then childRemovedConn:Disconnect() end
+
+		childAddedConn = folder.ChildAdded:Connect(function(child)
+			if not parEnabled then return end
+			if child:IsA("Model") and child.Name == "Bot" then
+				local hum = child:FindFirstChildOfClass("Humanoid")
+				if hum then applyParalyzeTo(hum) end
+			end
+		end)
+
+		childRemovedConn = folder.ChildRemoved:Connect(function(child)
+			if child:IsA("Model") and child.Name == "Bot" then
+				local hum = child:FindFirstChildOfClass("Humanoid")
+				if hum and original[hum] then original[hum] = nil end
+			end
+		end)
+	end
+
+	local function stopParalyze()
+		forEachBotHumanoid(function(_, hum) revertParalyzeFrom(hum) end)
+		if childAddedConn then childAddedConn:Disconnect() childAddedConn = nil end
+		if childRemovedConn then childRemovedConn:Disconnect() childRemovedConn = nil end
+		original = {}
+	end
+
+	local function setParalyzeEnabled(on)
+		parEnabled = on
+		player:SetAttribute(ATTR_PARALYZE, on)
+		setParSwitchVisual(on)
+		if on then startParalyze() else stopParalyze() end
+	end
+
+	-- Initialize + wire
+	setParalyzeEnabled(parEnabled or false)
+	parSwitch.MouseButton1Click:Connect(function()
+		setParalyzeEnabled(not parEnabled)
+	end)
+
+	player.CharacterAdded:Connect(function()
+		if parEnabled then
+			task.delay(0.25, startParalyze)
+		end
+	end)
+end
 
 local pageShop  = makePage("ShopPage")
 
@@ -1637,10 +1814,10 @@ fader.ZIndex = 999
 fader.Parent = win
 corner(fader, 14)
 
-local homePos = win.Position
-local isOpen, animLock, windowReady = false, false, false
+homePos = win.Position
+isOpen, animLock, windowReady = false, false, false
 
-local function openWindow()
+function openWindow()
 	if animLock or isOpen or not windowReady then return end
 	animLock = true
 	win.Visible = true
@@ -1657,7 +1834,7 @@ local function openWindow()
 	isOpen, animLock = true, false
 end
 
-local function closeWindow()
+function closeWindow()
 	if animLock or not isOpen or not windowReady then return end
 	animLock = true
 	tween(fader, TweenInfo.new(0.20, Enum.EasingStyle.Sine, Enum.EasingDirection.In), {BackgroundTransparency = 0})
@@ -1668,7 +1845,7 @@ local function closeWindow()
 	isOpen, animLock = false, false
 end
 
-local function toggleWindow()
+function toggleWindow()
 	if not windowReady then return end
 	if isOpen then closeWindow() else openWindow() end
 end
@@ -1700,7 +1877,7 @@ local function safeSetCoreAll(enabled)
 	end
 end
 
-local function playStunningIntro()
+function playStunningIntro()
 	local introGui = Instance.new("ScreenGui")
 	introGui.Name = "PT_Intro"
 	introGui.IgnoreGuiInset = true         -- fill the entire screen
