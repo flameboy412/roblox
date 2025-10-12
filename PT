@@ -213,6 +213,219 @@ local function makePage(name)
 	return f
 end
 local pageItems = makePage("ItemsPage")
+-- [Items UI] put right after: local pageItems = makePage("ItemsPage")
+
+-- Top search bar
+local itemsSearch = Instance.new("TextBox")
+itemsSearch.Name = "ItemsSearch"
+itemsSearch.Parent = pageItems
+itemsSearch.ClearTextOnFocus = false
+itemsSearch.PlaceholderText = "Search items..."
+itemsSearch.Text = ""
+itemsSearch.Font = Enum.Font.Gotham
+itemsSearch.TextSize = 14
+itemsSearch.TextColor3 = Color3.new(1,1,1)
+itemsSearch.PlaceholderColor3 = Color3.fromRGB(200, 190, 220)
+itemsSearch.BackgroundColor3 = Color3.fromRGB(66, 47, 88) -- ACCENT tone
+itemsSearch.BorderSizePixel = 0
+itemsSearch.Size = UDim2.new(1, -16, 0, 32)
+itemsSearch.Position = UDim2.new(0, 8, 0, 8)
+local itemsSearchCorner = Instance.new("UICorner", itemsSearch) itemsSearchCorner.CornerRadius = UDim.new(0, 8)
+
+-- Scroll list (right-side vertical scrollbar)
+local itemsList = Instance.new("ScrollingFrame")
+itemsList.Name = "ItemsList"
+itemsList.Parent = pageItems
+itemsList.BackgroundTransparency = 1
+itemsList.BorderSizePixel = 0
+itemsList.ScrollBarThickness = 8
+itemsList.ScrollBarImageColor3 = Color3.fromRGB(170, 82, 205) -- TAB_SEL tone
+itemsList.ScrollingDirection = Enum.ScrollingDirection.Y
+itemsList.AutomaticCanvasSize = Enum.AutomaticSize.Y
+itemsList.Size = UDim2.new(1, -16, 1, -56) -- below search (32) + margins
+itemsList.Position = UDim2.new(0, 8, 0, 48)
+
+local pad = Instance.new("UIPadding", itemsList)
+pad.PaddingTop = UDim.new(0, 8)
+pad.PaddingLeft = UDim.new(0, 8)
+pad.PaddingRight = UDim.new(0, 8)
+pad.PaddingBottom = UDim.new(0, 8)
+
+local itemsLayout = Instance.new("UIListLayout", itemsList)
+itemsLayout.SortOrder = Enum.SortOrder.Name -- alphabetical by name by default
+itemsLayout.Padding = UDim.new(0, 6)
+
+-- Button factory (visuals match your theme)
+local function makeItemButton(text)
+	local b = Instance.new("TextButton")
+	b.Name = text
+	b.Text = text
+	b.AutoButtonColor = false
+	b.Font = Enum.Font.GothamBold
+	b.TextSize = 14
+	b.TextColor3 = Color3.new(1,1,1)
+	b.BackgroundColor3 = Color3.fromRGB(145, 59, 167) -- TAB
+	b.BorderSizePixel = 0
+	b.Size = UDim2.new(1, 0, 0, 30)
+	local c = Instance.new("UICorner", b) c.CornerRadius = UDim.new(0, 8)
+	local stroke = Instance.new("UIStroke", b)
+	stroke.Color = Color3.fromRGB(170, 82, 205) -- TAB_SEL
+	stroke.Thickness = 1
+	stroke.Transparency = 0.6
+	-- Hover glow
+	b.MouseEnter:Connect(function()
+		b.BackgroundColor3 = Color3.fromRGB(170, 82, 205)
+		stroke.Transparency = 0.4
+	end)
+	b.MouseLeave:Connect(function()
+		b.BackgroundColor3 = Color3.fromRGB(145, 59, 167)
+		stroke.Transparency = 0.6
+	end)
+	return b
+end
+-- [Items logic] live scan of Models, search, and teleport
+
+-- Root getter (resolves path each time in case the hierarchy reloads)
+local function getLootRoot()
+	local env = workspace:FindFirstChild("Environment")
+	if not env then return nil end
+	local wms = env:FindFirstChild("WorldModelSpawns")
+	if not wms then return nil end
+	local loot = wms:FindFirstChild("LootSpawnPoints")
+	return loot
+end
+
+-- Storage
+local modelButton = {}   -- [Model] = TextButton
+local nameChanged = {}   -- [Model] = RBXScriptConnection
+local observingRoot -- current root folder we watch
+local rootConnections = {} -- to disconnect when root changes
+
+-- Teleport helper
+local function teleportToModel(m)
+	if not m or not m:IsA("Model") then return end
+	local char = player.Character or player.CharacterAdded:Wait()
+	if not char then return end
+	-- Prefer Pivot; fall back to PrimaryPart or part in model
+	local pivotCFrame
+	local ok, cf = pcall(function() return m:GetPivot() end)
+	if ok then
+		pivotCFrame = cf
+	elseif m.PrimaryPart then
+		pivotCFrame = m.PrimaryPart.CFrame
+	else
+		local part = m:FindFirstChildWhichIsA("BasePart", true)
+		if part then pivotCFrame = part.CFrame end
+	end
+	if not pivotCFrame then return end
+
+	local offset = CFrame.new(0, 4, 0) -- small lift above pivot
+	-- Use Character:PivotTo for a clean teleport
+	char:PivotTo(pivotCFrame * offset)
+end
+
+-- Create/remove buttons
+local function addModel(m)
+	if modelButton[m] then return end
+	local b = makeItemButton(m.Name)
+	b.Parent = itemsList
+	modelButton[m] = b
+
+	-- Click to TP
+	b.MouseButton1Click:Connect(function()
+		teleportToModel(m)
+	end)
+
+	-- Keep name in sync
+	nameChanged[m] = m:GetPropertyChangedSignal("Name"):Connect(function()
+		b.Name = m.Name
+		b.Text = m.Name
+	end)
+end
+
+local function removeModel(m)
+	local b = modelButton[m]
+	if b then b:Destroy() end
+	modelButton[m] = nil
+	if nameChanged[m] then nameChanged[m]:Disconnect() nameChanged[m] = nil end
+end
+
+-- Populate once (scans all descendants; only Models)
+local function populateAll(root)
+	for m, _ in pairs(modelButton) do removeModel(m) end
+	if not root then return end
+	for _, inst in ipairs(root:GetDescendants()) do
+		if inst:IsA("Model") then addModel(inst) end
+	end
+end
+
+-- Filter by search text (case-insensitive; hides/show buttons)
+local function applySearchFilter()
+	local query = string.lower(itemsSearch.Text)
+	for m, b in pairs(modelButton) do
+		if query == "" then
+			b.Visible = true
+		else
+			b.Visible = string.find(string.lower(m.Name), query, 1, true) ~= nil
+		end
+	end
+end
+itemsSearch:GetPropertyChangedSignal("Text"):Connect(applySearchFilter)
+
+-- Attach watchers to the current root so lists auto-update
+local function disconnectRootWatchers()
+	for _, c in ipairs(rootConnections) do
+		if c then c:Disconnect() end
+	end
+	rootConnections = {}
+	observingRoot = nil
+end
+
+local function attachRootWatchers(root)
+	disconnectRootWatchers()
+	if not root then return end
+	observingRoot = root
+
+	-- Build initial list
+	populateAll(root)
+	applySearchFilter()
+
+	-- Watch for new/removed models under the root
+	table.insert(rootConnections, root.DescendantAdded:Connect(function(inst)
+		if inst:IsA("Model") then
+			addModel(inst)
+			applySearchFilter()
+		end
+	end))
+	table.insert(rootConnections, root.DescendantRemoving:Connect(function(inst)
+		if inst:IsA("Model") then
+			removeModel(inst)
+		end
+	end))
+
+	-- If the root itself moves or gets replaced, we’ll retry binding
+	table.insert(rootConnections, root.AncestryChanged:Connect(function(_, parent)
+		if not parent then
+			-- lost root
+			task.defer(function()
+				disconnectRootWatchers()
+			end)
+		end
+	end))
+end
+
+-- Poll the path periodically and re-bind if the root changes (covers reloads)
+task.spawn(function()
+	local last
+	while pageItems.Parent do
+		local root = getLootRoot()
+		if root ~= last then
+			attachRootWatchers(root)
+			last = root
+		end
+		task.wait(1.0) -- light polling; keeps tabs updated with spawners that re-create the tree
+	end
+end)
 local pageAmmo  = makePage("AmmoPage")
 local pageMisc  = makePage("MiscPage")
 local pageList  = {pageItems, pageAmmo, pageMisc}
