@@ -8,8 +8,101 @@ local RunService   = game:GetService("RunService")
 local StarterGui   = game:GetService("StarterGui")
 local SoundService = game:GetService("SoundService")
 
+-- Kick if not in the correct place (122675988530857)
+-- Put this near the top of the LocalScript, before any other logic runs.
+
+do
+	local REQUIRED_PLACE_ID = 122675988530857
+	-- Remove the IsStudio() check if you also want this to trigger while testing in Studio.
+	if not RunService:IsStudio() and game.PlaceId ~= REQUIRED_PLACE_ID then
+		local lp = Players.LocalPlayer
+		task.defer(function()
+			pcall(function()
+				lp:Kick("Wrong game buddy :3")
+			end)
+		end)
+		-- Prevent the rest of the script from continuing
+		while true do task.wait(1e6) end
+	end
+end
+
 local player    = Players.LocalPlayer
 local playerGui = player:WaitForChild("PlayerGui")
+
+-- One-time notification to the local player at script start.
+-- Tries Roblox CoreGui notification first; if SetCore isn't ready,
+-- shows a custom bottom-right toast instead.
+
+local function sendIntroNotification()
+	-- Try Roblox notification
+	for i = 1, 30 do
+		local ok = pcall(function()
+			game:GetService("StarterGui"):SetCore("SendNotification", {
+				Title    = "PT Hack :3",
+				Text     = "Script made by: ilovegay1113",
+				Duration = 6,
+				-- Icon = "rbxassetid://<optionalIconId>"
+			})
+		end)
+		if ok then return end
+		task.wait(0.1)
+	end
+
+	-- Fallback: bottom-right toast (always local-only)
+	local playerGui = game:GetService("Players").LocalPlayer:WaitForChild("PlayerGui")
+
+	local toastGui = Instance.new("ScreenGui")
+	toastGui.Name = "PT_Toast"
+	toastGui.IgnoreGuiInset = true
+	toastGui.ResetOnSpawn = false
+	toastGui.DisplayOrder = 999999
+	toastGui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
+	toastGui.Parent = playerGui
+
+	local toast = Instance.new("Frame")
+	toast.AnchorPoint = Vector2.new(1,1)
+	toast.Position = UDim2.new(1, 340, 1, -12) -- start offscreen right
+	toast.Size = UDim2.new(0, 320, 0, 56)
+	toast.BackgroundColor3 = Color3.fromRGB(43, 18, 56)
+	toast.BackgroundTransparency = 0.08
+	toast.BorderSizePixel = 0
+	toast.Parent = toastGui
+
+	local c = Instance.new("UICorner", toast) c.CornerRadius = UDim.new(0, 8)
+	local s = Instance.new("UIStroke", toast) s.Color = Color3.fromRGB(170, 82, 205) s.Transparency = 0.25 s.Thickness = 1
+
+	local label = Instance.new("TextLabel")
+	label.BackgroundTransparency = 1
+	label.Text = "Script made by: ilovegay1113"
+	label.Font = Enum.Font.Gotham
+	label.TextSize = 14
+	label.TextColor3 = Color3.new(1,1,1)
+	label.TextXAlignment = Enum.TextXAlignment.Left
+	label.TextYAlignment = Enum.TextYAlignment.Center
+	label.TextWrapped = true
+	label.Size = UDim2.new(1, -20, 1, 0)
+	label.Position = UDim2.new(0, 10, 0, 0)
+	label.Parent = toast
+
+	-- Slide-in
+	game:GetService("TweenService")
+		:Create(toast, TweenInfo.new(0.35, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {Position = UDim2.new(1, -12, 1, -12)})
+		:Play()
+
+	-- Auto-hide after 6s
+	task.delay(6, function()
+		local t = game:GetService("TweenService")
+			:Create(toast, TweenInfo.new(0.35, Enum.EasingStyle.Quad, Enum.EasingDirection.In), {
+				Position = UDim2.new(1, 340, 1, -12),
+				BackgroundTransparency = 1
+			})
+		t:Play()
+		t.Completed:Once(function() toastGui:Destroy() end)
+	end)
+end
+
+-- Call this once at startup (before your intro starts)
+sendIntroNotification()
 
 -- Singleton guard: ensure UI is created only once per join/session
 if player:GetAttribute("PT_UI_INITIALIZED") then
@@ -427,6 +520,157 @@ task.spawn(function()
 	end
 end)
 local pageAmmo  = makePage("AmmoPage")
+
+-- [Ammo UI] put right after: local pageAmmo = makePage("AmmoPage")
+
+local ammoList = Instance.new("ScrollingFrame")
+ammoList.Name = "AmmoList"
+ammoList.Parent = pageAmmo
+ammoList.BackgroundTransparency = 1
+ammoList.BorderSizePixel = 0
+ammoList.AutomaticCanvasSize = Enum.AutomaticSize.Y
+ammoList.ScrollingDirection = Enum.ScrollingDirection.Y
+ammoList.ScrollBarThickness = 8
+ammoList.ScrollBarImageColor3 = Color3.fromRGB(170, 82, 205) -- theme
+ammoList.Size = UDim2.new(1, -16, 1, -16)
+ammoList.Position = UDim2.new(0, 8, 0, 8)
+
+local ammoPad = Instance.new("UIPadding", ammoList)
+ammoPad.PaddingTop = UDim.new(0, 8)
+ammoPad.PaddingLeft = UDim.new(0, 8)
+ammoPad.PaddingRight = UDim.new(0, 8)
+ammoPad.PaddingBottom = UDim.new(0, 8)
+
+local ammoLayout = Instance.new("UIListLayout", ammoList)
+ammoLayout.SortOrder = Enum.SortOrder.Name -- alphabetical by button name
+ammoLayout.Padding = UDim.new(0, 6)
+
+local function makeAmmoButton(text)
+	local b = Instance.new("TextButton")
+	b.Name = text
+	b.Text = text
+	b.AutoButtonColor = false
+	b.Font = Enum.Font.GothamBold
+	b.TextSize = 14
+	b.TextColor3 = Color3.new(1,1,1)
+	b.BackgroundColor3 = Color3.fromRGB(145, 59, 167) -- tab color
+	b.BorderSizePixel = 0
+	b.Size = UDim2.new(1, 0, 0, 30)
+	-- style
+	local c = Instance.new("UICorner", b) c.CornerRadius = UDim.new(0, 8)
+	local s = Instance.new("UIStroke", b) s.Color = Color3.fromRGB(170, 82, 205) s.Thickness = 1 s.Transparency = 0.6
+	b.MouseEnter:Connect(function() b.BackgroundColor3 = Color3.fromRGB(170, 82, 205) s.Transparency = 0.4 end)
+	b.MouseLeave:Connect(function() b.BackgroundColor3 = Color3.fromRGB(145, 59, 167) s.Transparency = 0.6 end)
+	return b
+end
+
+-- [Ammo logic] MeshPart scan + live updates + teleport on click
+
+-- Resolve the ammo root each time (handles reloads)
+local function getAmmoRoot()
+	local env = workspace:FindFirstChild("Environment")
+	if not env then return nil end
+	local inter = env:FindFirstChild("Interactable")
+	if not inter then return nil end
+	local ammo = inter:FindFirstChild("Ammo")
+	return ammo
+end
+
+-- Teleport helper for MeshPart
+local function teleportToPart(part: MeshPart)
+	if not part or not part:IsA("BasePart") then return end
+	local char = player.Character or player.CharacterAdded:Wait()
+	if not char then return end
+	-- Stand slightly above the part
+	char:PivotTo(part.CFrame * CFrame.new(0, 4, 0))
+end
+
+-- Storage and cleanup (typed)
+local meshButton: { [Instance]: TextButton } = {}
+local nameConn:   { [Instance]: RBXScriptConnection } = {}
+local rootConns:  { RBXScriptConnection } = {}
+local observedRoot: Instance? = nil
+
+local function addMesh(part: MeshPart)
+	if meshButton[part] then return end
+	local b = makeAmmoButton(part.Name)
+	b.Parent = ammoList
+	meshButton[part] = b
+
+	-- Click to TP
+	b.MouseButton1Click:Connect(function()
+		teleportToPart(part)
+	end)
+
+	-- Keep label synced with part.Name
+	nameConn[part] = part:GetPropertyChangedSignal("Name"):Connect(function()
+		b.Name = part.Name
+		b.Text = part.Name
+	end)
+end
+
+local function removeMesh(part: MeshPart)
+	local b = meshButton[part]
+	if b then b:Destroy() end
+	meshButton[part] = nil
+	if nameConn[part] then nameConn[part]:Disconnect() nameConn[part] = nil end
+end
+
+local function clearAll()
+	for inst,_ in pairs(meshButton) do removeMesh(inst) end
+end
+
+-- Initial/refresh population
+local function populateAll(root: Instance?)
+	clearAll()
+	if not root then return end
+	for _, inst in ipairs(root:GetDescendants()) do
+		if inst:IsA("MeshPart") then
+			addMesh(inst)
+		end
+	end
+end
+
+-- Manage watchers on the ammo root so list auto-updates
+local function disconnectRootWatchers()
+	for _, c in ipairs(rootConns) do
+		if c then c:Disconnect() end
+	end
+	rootConns = {}
+	observedRoot = nil
+end
+
+local function attachRootWatchers(root: Instance?)
+	disconnectRootWatchers()
+	if not root then return end
+	observedRoot = root
+
+	populateAll(root)
+
+	table.insert(rootConns, root.DescendantAdded:Connect(function(inst)
+		if inst:IsA("MeshPart") then addMesh(inst) end
+	end))
+	table.insert(rootConns, root.DescendantRemoving:Connect(function(inst)
+		if inst:IsA("MeshPart") then removeMesh(inst) end
+	end))
+	table.insert(rootConns, root.AncestryChanged:Connect(function(_, parent)
+		if not parent then disconnectRootWatchers() end
+	end))
+end
+
+-- Rebind to the path if it gets recreated (keeps the tab always updating)
+task.spawn(function()
+	local last
+	while pageAmmo.Parent do
+		local root = getAmmoRoot()
+		if root ~= last then
+			attachRootWatchers(root)
+			last = root
+		end
+		task.wait(1.0)
+	end
+end)
+
 local pageMisc  = makePage("MiscPage")
 local pageList  = {pageItems, pageAmmo, pageMisc}
 
@@ -576,10 +820,18 @@ local function toggleWindow()
 	if isOpen then closeWindow() else openWindow() end
 end
 
+-- Replace the old LeftControl handler with this N-key handler.
+-- This respects your zoom-fade open/close via toggleWindow() and
+-- ignores key presses while typing in a TextBox (e.g., search bar).
+
 UIS.InputBegan:Connect(function(input, processed)
 	if processed then return end
-	if input.KeyCode == Enum.KeyCode.LeftControl then
-		toggleWindow()
+	-- Don't toggle while typing inside a TextBox
+	if UIS:GetFocusedTextBox() then return end
+
+	if input.UserInputType == Enum.UserInputType.Keyboard
+		and input.KeyCode == Enum.KeyCode.N then
+		toggleWindow() -- uses your existing open/close animation
 	end
 end)
 
