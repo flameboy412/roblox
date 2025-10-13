@@ -544,7 +544,7 @@ local function attachRootWatchers(root)
 		end
 	end))
 
-	-- If the root itself moves or gets replaced, we’ll retry binding
+	-- If the root itself moves or gets replaced, we'll retry binding
 	table.insert(rootConnections, root.AncestryChanged:Connect(function(_, parent)
 		if not parent then
 			-- lost root
@@ -722,98 +722,151 @@ end)
 local pageMisc  = makePage("MiscPage")
 
 -- [Misc UI] Toggle row
-local miscContainer = Instance.new("Frame")
+local miscContainer = Instance.new("ScrollingFrame")
+miscContainer.Name = "MiscContainer"
 miscContainer.BackgroundTransparency = 1
+miscContainer.BorderSizePixel = 0
 miscContainer.Size = UDim2.new(1, -16, 1, -16)
 miscContainer.Position = UDim2.new(0, 8, 0, 8)
+miscContainer.ScrollingDirection = Enum.ScrollingDirection.Y
+miscContainer.AutomaticCanvasSize = Enum.AutomaticSize.Y
+miscContainer.ScrollBarThickness = 8
+miscContainer.ScrollBarImageColor3 = Color3.fromRGB(170, 82, 205)
+miscContainer.CanvasSize = UDim2.new(0, 0, 0, 0)
 miscContainer.Parent = pageMisc
 
--- [Misc UI] No ragdoll toggle row
-local rowRag = Instance.new("Frame")
-rowRag.BackgroundTransparency = 1
-rowRag.Size = UDim2.new(1, 0, 0, 36)
-rowRag.Parent = miscContainer
+local miscPad = Instance.new("UIPadding", miscContainer)
+miscPad.PaddingTop = UDim.new(0, 8)
+miscPad.PaddingLeft = UDim.new(0, 8)
+miscPad.PaddingRight = UDim.new(0, 8)
+miscPad.PaddingBottom = UDim.new(0, 8)
 
-local ragLabel = Instance.new("TextLabel")
-ragLabel.BackgroundTransparency = 1
-ragLabel.Text = "No ragdoll (No Fall)"
-ragLabel.Font = Enum.Font.GothamBold
-ragLabel.TextSize = 16
-ragLabel.TextColor3 = Color3.new(1,1,1)
-ragLabel.TextXAlignment = Enum.TextXAlignment.Left
-ragLabel.Size = UDim2.new(1, -120, 1, 0)
-ragLabel.Parent = rowRag
-
-local ragSwitch = Instance.new("TextButton")
-ragSwitch.Name = "NoRagdollSwitch"
-ragSwitch.AutoButtonColor = false
-ragSwitch.Text = ""
-ragSwitch.AnchorPoint = Vector2.new(1, 0.5)
-ragSwitch.Position = UDim2.new(1, 0, 0.5, 0)
-ragSwitch.Size = UDim2.new(0, 64, 0, 28)
-ragSwitch.BackgroundColor3 = Color3.fromRGB(66, 47, 88) -- off
-ragSwitch.BorderSizePixel = 0
-ragSwitch.Parent = rowRag
-local rgCorner = Instance.new("UICorner", ragSwitch) rgCorner.CornerRadius = UDim.new(1, 0)
-local rgStroke = Instance.new("UIStroke", ragSwitch) rgStroke.Color = Color3.fromRGB(170, 82, 205) rgStroke.Transparency = 0.4
-
-local ragKnob = Instance.new("Frame")
-ragKnob.Name = "Knob"
-ragKnob.AnchorPoint = Vector2.new(0, 0.5)
-ragKnob.Position = UDim2.new(0, 3, 0.5, 0)
-ragKnob.Size = UDim2.new(0, 24, 0, 24)
-ragKnob.BackgroundColor3 = Color3.fromRGB(145, 59, 167)
-ragKnob.BorderSizePixel = 0
-ragKnob.Parent = ragSwitch
-local rkCorner = Instance.new("UICorner", ragKnob) rkCorner.CornerRadius = UDim.new(1, 0)
-
-local miscLayout = Instance.new("UIListLayout")
-miscLayout.Padding = UDim.new(0, 10)
+local miscLayout = Instance.new("UIListLayout", miscContainer)
 miscLayout.SortOrder = Enum.SortOrder.LayoutOrder
-miscLayout.Parent = miscContainer
+miscLayout.Padding = UDim.new(0, 10)
 
-local row = Instance.new("Frame")
-row.BackgroundTransparency = 1
-row.Size = UDim2.new(1, 0, 0, 36)
-row.Parent = miscContainer
+-- Group UI elements to reduce local variable count
+local ui = {
+	rows = {},
+	labels = {},
+	switches = {},
+	knobs = {},
+	corners = {},
+	strokes = {}
+}
 
-local label = Instance.new("TextLabel")
-label.BackgroundTransparency = 1
-label.Text = "Infinite Stamina"
-label.Font = Enum.Font.GothamBold
-label.TextSize = 16
-label.TextColor3 = Color3.new(1,1,1)
-label.TextXAlignment = Enum.TextXAlignment.Left
-label.Size = UDim2.new(1, -120, 1, 0)
-label.Parent = row
+-- Create UI elements using table structure
+ui.rows.stamina = Instance.new("Frame")
+ui.rows.stamina.BackgroundTransparency = 1
+ui.rows.stamina.Size = UDim2.new(1, 0, 0, 36)
+ui.rows.stamina.Parent = miscContainer
 
--- Pill switch (right side)
-local switch = Instance.new("TextButton")
-switch.Name = "InfStaminaSwitch"
-switch.AutoButtonColor = false
-switch.Text = ""
-switch.AnchorPoint = Vector2.new(1, 0.5)
-switch.Position = UDim2.new(1, 0, 0.5, 0)
-switch.Size = UDim2.new(0, 64, 0, 28)
-switch.BackgroundColor3 = Color3.fromRGB(66, 47, 88) -- off color
-switch.BorderSizePixel = 0
-switch.Parent = row
-local swCorner = Instance.new("UICorner", switch) swCorner.CornerRadius = UDim.new(1, 0)
-local swStroke = Instance.new("UIStroke", switch) swStroke.Color = Color3.fromRGB(170, 82, 205) swStroke.Transparency = 0.4
+ui.labels.stamina = Instance.new("TextLabel")
+ui.labels.stamina.BackgroundTransparency = 1
+ui.labels.stamina.Text = "Infinite Stamina"
+ui.labels.stamina.Font = Enum.Font.GothamBold
+ui.labels.stamina.TextSize = 16
+ui.labels.stamina.TextColor3 = Color3.new(1,1,1)
+ui.labels.stamina.TextXAlignment = Enum.TextXAlignment.Left
+ui.labels.stamina.Size = UDim2.new(1, -120, 1, 0)
+ui.labels.stamina.Parent = ui.rows.stamina
 
--- Knob
-local knob = Instance.new("Frame")
-knob.Name = "Knob"
-knob.AnchorPoint = Vector2.new(0, 0.5)
-knob.Position = UDim2.new(0, 3, 0.5, 0)
-knob.Size = UDim2.new(0, 24, 0, 24)
-knob.BackgroundColor3 = Color3.fromRGB(145, 59, 167)
-knob.BorderSizePixel = 0
-knob.Parent = switch
-local kCorner = Instance.new("UICorner", knob) kCorner.CornerRadius = UDim.new(1, 0)
+ui.switches.stamina = Instance.new("TextButton")
+ui.switches.stamina.Name = "InfStaminaSwitch"
+ui.switches.stamina.AutoButtonColor = false
+ui.switches.stamina.Text = ""
+ui.switches.stamina.AnchorPoint = Vector2.new(1, 0.5)
+ui.switches.stamina.Position = UDim2.new(1, 0, 0.5, 0)
+ui.switches.stamina.Size = UDim2.new(0, 64, 0, 28)
+ui.switches.stamina.BackgroundColor3 = Color3.fromRGB(66, 47, 88)
+ui.switches.stamina.BorderSizePixel = 0
+ui.switches.stamina.Parent = ui.rows.stamina
+ui.corners.stamina = Instance.new("UICorner", ui.switches.stamina) 
+ui.corners.stamina.CornerRadius = UDim.new(1, 0)
+ui.strokes.stamina = Instance.new("UIStroke", ui.switches.stamina) 
+ui.strokes.stamina.Color = Color3.fromRGB(170, 82, 205) 
+ui.strokes.stamina.Transparency = 0.4
 
--- [Misc UI] Kill all bots button + Paralyze all bots toggle
--- 1) Button: Kill all bots
+ui.knobs.stamina = Instance.new("Frame")
+ui.knobs.stamina.Name = "Knob"
+ui.knobs.stamina.AnchorPoint = Vector2.new(0, 0.5)
+ui.knobs.stamina.Position = UDim2.new(0, 3, 0.5, 0)
+ui.knobs.stamina.Size = UDim2.new(0, 24, 0, 24)
+ui.knobs.stamina.BackgroundColor3 = Color3.fromRGB(145, 59, 167)
+ui.knobs.stamina.BorderSizePixel = 0
+ui.knobs.stamina.Parent = ui.switches.stamina
+ui.corners.staminaKnob = Instance.new("UICorner", ui.knobs.stamina) 
+ui.corners.staminaKnob.CornerRadius = UDim.new(1, 0)
+
+-- Create aliases for backward compatibility
+local row, label, switch, knob = ui.rows.stamina, ui.labels.stamina, ui.switches.stamina, ui.knobs.stamina
+
+-- Helper function to create toggle rows
+local function createToggleRow(name, text, switchName)
+	ui.rows[name] = Instance.new("Frame")
+	ui.rows[name].BackgroundTransparency = 1
+	ui.rows[name].Size = UDim2.new(1, 0, 0, 36)
+	ui.rows[name].Parent = miscContainer
+
+	ui.labels[name] = Instance.new("TextLabel")
+	ui.labels[name].BackgroundTransparency = 1
+	ui.labels[name].Text = text
+	ui.labels[name].Font = Enum.Font.GothamBold
+	ui.labels[name].TextSize = 16
+	ui.labels[name].TextColor3 = Color3.new(1,1,1)
+	ui.labels[name].TextXAlignment = Enum.TextXAlignment.Left
+	ui.labels[name].Size = UDim2.new(1, -120, 1, 0)
+	ui.labels[name].Parent = ui.rows[name]
+
+	ui.switches[name] = Instance.new("TextButton")
+	ui.switches[name].Name = switchName
+	ui.switches[name].AutoButtonColor = false
+	ui.switches[name].Text = ""
+	ui.switches[name].AnchorPoint = Vector2.new(1, 0.5)
+	ui.switches[name].Position = UDim2.new(1, 0, 0.5, 0)
+	ui.switches[name].Size = UDim2.new(0, 64, 0, 28)
+	ui.switches[name].BackgroundColor3 = Color3.fromRGB(66, 47, 88)
+	ui.switches[name].BorderSizePixel = 0
+	ui.switches[name].Parent = ui.rows[name]
+	ui.corners[name] = Instance.new("UICorner", ui.switches[name]) 
+	ui.corners[name].CornerRadius = UDim.new(1, 0)
+	ui.strokes[name] = Instance.new("UIStroke", ui.switches[name]) 
+	ui.strokes[name].Color = Color3.fromRGB(170, 82, 205) 
+	ui.strokes[name].Transparency = 0.4
+
+	ui.knobs[name] = Instance.new("Frame")
+	ui.knobs[name].Name = "Knob"
+	ui.knobs[name].AnchorPoint = Vector2.new(0, 0.5)
+	ui.knobs[name].Position = UDim2.new(0, 3, 0.5, 0)
+	ui.knobs[name].Size = UDim2.new(0, 24, 0, 24)
+	ui.knobs[name].BackgroundColor3 = Color3.fromRGB(145, 59, 167)
+	ui.knobs[name].BorderSizePixel = 0
+	ui.knobs[name].Parent = ui.switches[name]
+	ui.corners[name .. "Knob"] = Instance.new("UICorner", ui.knobs[name]) 
+	ui.corners[name .. "Knob"].CornerRadius = UDim.new(1, 0)
+end
+
+-- Create all toggle rows
+createToggleRow("ragdoll", "No ragdoll (No Fall)", "NoRagdollSwitch")
+createToggleRow("paralyze", "Paralyze all bots", "ParalyzeBotsSwitch")
+createToggleRow("recoil", "No recoil", "NoRecoilSwitch")
+createToggleRow("silent", "Silent gun", "SilentGunSwitch")
+createToggleRow("fast", "Fast bullet", "FastBulletSwitch")
+createToggleRow("equip", "No equip CD", "NoEquipCDSwitch")
+createToggleRow("auto", "Full auto", "FullAutoSwitch")
+createToggleRow("fireRate", "Fast fire rate", "FastFireRateSwitch")
+
+-- Create aliases for backward compatibility
+local rowRag, ragLabel, ragSwitch, ragKnob = ui.rows.ragdoll, ui.labels.ragdoll, ui.switches.ragdoll, ui.knobs.ragdoll
+local parRow, parLabel, parSwitch, parKnob = ui.rows.paralyze, ui.labels.paralyze, ui.switches.paralyze, ui.knobs.paralyze
+local recoilRow, recoilLabel, recoilSwitch, recoilKnob = ui.rows.recoil, ui.labels.recoil, ui.switches.recoil, ui.knobs.recoil
+local silentRow, silentLabel, silentSwitch, silentKnob = ui.rows.silent, ui.labels.silent, ui.switches.silent, ui.knobs.silent
+local fastRow, fastLabel, fastSwitch, fastKnob = ui.rows.fast, ui.labels.fast, ui.switches.fast, ui.knobs.fast
+local equipRow, equipLabel, equipSwitch, equipKnob = ui.rows.equip, ui.labels.equip, ui.switches.equip, ui.knobs.equip
+local autoRow, autoLabel, autoSwitch, autoKnob = ui.rows.auto, ui.labels.auto, ui.switches.auto, ui.knobs.auto
+local fireRateRow, fireRateLabel, fireRateSwitch, fireRateKnob = ui.rows.fireRate, ui.labels.fireRate, ui.switches.fireRate, ui.knobs.fireRate
+
+-- [Misc UI] Kill all bots button
 local killBotsBtn = Instance.new("TextButton")
 killBotsBtn.Name = "KillAllBotsButton"
 killBotsBtn.Text = "Kill all bots"
@@ -831,45 +884,6 @@ do
 	killBotsBtn.MouseEnter:Connect(function() killBotsBtn.BackgroundColor3 = Color3.fromRGB(170, 82, 205) s.Transparency = 0.35 end)
 	killBotsBtn.MouseLeave:Connect(function() killBotsBtn.BackgroundColor3 = Color3.fromRGB(145, 59, 167) s.Transparency = 0.55 end)
 end
-
--- 2) Toggle row: Paralyze all bots
-local parRow = Instance.new("Frame")
-parRow.BackgroundTransparency = 1
-parRow.Size = UDim2.new(1, 0, 0, 36)
-parRow.Parent = miscContainer
-
-local parLabel = Instance.new("TextLabel")
-parLabel.BackgroundTransparency = 1
-parLabel.Text = "Paralyze all bots"
-parLabel.Font = Enum.Font.GothamBold
-parLabel.TextSize = 16
-parLabel.TextColor3 = Color3.new(1,1,1)
-parLabel.TextXAlignment = Enum.TextXAlignment.Left
-parLabel.Size = UDim2.new(1, -120, 1, 0)
-parLabel.Parent = parRow
-
-local parSwitch = Instance.new("TextButton")
-parSwitch.Name = "ParalyzeBotsSwitch"
-parSwitch.AutoButtonColor = false
-parSwitch.Text = ""
-parSwitch.AnchorPoint = Vector2.new(1, 0.5)
-parSwitch.Position = UDim2.new(1, 0, 0.5, 0)
-parSwitch.Size = UDim2.new(0, 64, 0, 28)
-parSwitch.BackgroundColor3 = Color3.fromRGB(66, 47, 88) -- OFF
-parSwitch.BorderSizePixel = 0
-parSwitch.Parent = parRow
-local psCorner = Instance.new("UICorner", parSwitch) psCorner.CornerRadius = UDim.new(1, 0)
-local psStroke = Instance.new("UIStroke", parSwitch) psStroke.Color = Color3.fromRGB(170, 82, 205) psStroke.Transparency = 0.4
-
-local parKnob = Instance.new("Frame")
-parKnob.Name = "Knob"
-parKnob.AnchorPoint = Vector2.new(0, 0.5)
-parKnob.Position = UDim2.new(0, 3, 0.5, 0)
-parKnob.Size = UDim2.new(0, 24, 0, 24)
-parKnob.BackgroundColor3 = Color3.fromRGB(145, 59, 167)
-parKnob.BorderSizePixel = 0
-parKnob.Parent = parSwitch
-local pkCorner = Instance.new("UICorner", parKnob) pkCorner.CornerRadius = UDim.new(1, 0)
 
 -- [Misc logic — SAFE Infinite Stamina toggle that won't break the UI]
 
@@ -1259,6 +1273,597 @@ do
 	end)
 end
 
+-- [Misc logic] No recoil toggle
+do
+	local ReplicatedStorage = game:GetService("ReplicatedStorage")
+	
+	local function setRecoilSwitchVisual(isOn)
+		if isOn then
+			recoilSwitch.BackgroundColor3 = Color3.fromRGB(90, 220, 255)
+			recoilKnob:TweenPosition(UDim2.new(1, -27, 0.5, 0), Enum.EasingDirection.Out, Enum.EasingStyle.Quad, 0.15, true)
+			recoilKnob.BackgroundColor3 = Color3.fromRGB(255, 105, 230)
+		else
+			recoilSwitch.BackgroundColor3 = Color3.fromRGB(66, 47, 88)
+			recoilKnob:TweenPosition(UDim2.new(0, 3, 0.5, 0), Enum.EasingDirection.Out, Enum.EasingStyle.Quad, 0.15, true)
+			recoilKnob.BackgroundColor3 = Color3.fromRGB(145, 59, 167)
+		end
+	end
+
+	local ATTR_NO_RECOIL = "PT_NoRecoil"
+	local noRecoilEnabled = player:GetAttribute(ATTR_NO_RECOIL) == true
+	local originals = {} -- [module] = {RecoilPower = ..., AngleX_Min = ..., etc}
+
+	local function getWeaponModules()
+		local assets = ReplicatedStorage:FindFirstChild("Assets")
+		if not assets then return {} end
+		local shared = assets:FindFirstChild("SharedData")
+		if not shared then return {} end
+		local settings = shared:FindFirstChild("WeaponSettings")
+		if not settings then return {} end
+
+		local mods = {}
+
+		-- Scan Firearms
+		local firearms = settings:FindFirstChild("Firearms")
+		if firearms then
+			for _, cat in ipairs(firearms:GetDescendants()) do
+				if cat:IsA("ModuleScript") then
+					table.insert(mods, cat)
+				end
+			end
+		end
+
+		-- Scan Melee
+		local melee = settings:FindFirstChild("Melee")
+		if melee then
+			for _, cat in ipairs(melee:GetDescendants()) do
+				if cat:IsA("ModuleScript") then
+					table.insert(mods, cat)
+				end
+			end
+		end
+
+		return mods
+	end
+
+	local function captureOriginal(mod)
+		if originals[mod] then return end
+		local ok, data = pcall(function() return require(mod) end)
+		if not ok or type(data) ~= "table" then return end
+		originals[mod] = {
+			CameraRecoilingEnabled = data.CameraRecoilingEnabled,
+			RecoilPower = data.RecoilPower or data.Recoil,
+			AngleX_Min = data.AngleX_Min,
+			AngleX_Max = data.AngleX_Max,
+			AngleY_Min = data.AngleY_Min,
+			AngleY_Max = data.AngleY_Max,
+			AngleZ_Min = data.AngleZ_Min,
+			AngleZ_Max = data.AngleZ_Max,
+			RecoilSpeed = data.RecoilSpeed,
+			RecoilDamper = data.RecoilDamper,
+			RecoilRedutionAimingDown = data.RecoilRedutionAimingDown,
+			RecoilRedution = data.RecoilRedution,
+		}
+	end
+
+	local function applyNoRecoil(mod)
+		captureOriginal(mod)
+		local ok, data = pcall(function() return require(mod) end)
+		if not ok or type(data) ~= "table" then return end
+		pcall(function()
+			data.CameraRecoilingEnabled = false
+			if data.RecoilPower then data.RecoilPower = 0 end
+			if data.Recoil then data.Recoil = 0 end
+			data.AngleX_Min = 0
+			data.AngleX_Max = 0
+			data.AngleY_Min = 0
+			data.AngleY_Max = 0
+			data.AngleZ_Min = 0
+			data.AngleZ_Max = 0
+			if data.RecoilSpeed then data.RecoilSpeed = 0 end
+			if data.RecoilDamper then data.RecoilDamper = 0 end
+			if data.RecoilRedutionAimingDown then data.RecoilRedutionAimingDown = 1 end
+			if data.RecoilRedution then data.RecoilRedution = 1 end
+		end)
+	end
+
+	local function restoreRecoil(mod)
+		local snap = originals[mod]
+		if not snap then return end
+		local ok, data = pcall(function() return require(mod) end)
+		if not ok or type(data) ~= "table" then return end
+		pcall(function()
+			if snap.CameraRecoilingEnabled ~= nil then data.CameraRecoilingEnabled = snap.CameraRecoilingEnabled end
+			if snap.RecoilPower ~= nil then 
+				if data.RecoilPower then data.RecoilPower = snap.RecoilPower end
+				if data.Recoil then data.Recoil = snap.RecoilPower end
+			end
+			if snap.AngleX_Min ~= nil then data.AngleX_Min = snap.AngleX_Min end
+			if snap.AngleX_Max ~= nil then data.AngleX_Max = snap.AngleX_Max end
+			if snap.AngleY_Min ~= nil then data.AngleY_Min = snap.AngleY_Min end
+			if snap.AngleY_Max ~= nil then data.AngleY_Max = snap.AngleY_Max end
+			if snap.AngleZ_Min ~= nil then data.AngleZ_Min = snap.AngleZ_Min end
+			if snap.AngleZ_Max ~= nil then data.AngleZ_Max = snap.AngleZ_Max end
+			if snap.RecoilSpeed ~= nil then data.RecoilSpeed = snap.RecoilSpeed end
+			if snap.RecoilDamper ~= nil then data.RecoilDamper = snap.RecoilDamper end
+			if snap.RecoilRedutionAimingDown ~= nil then data.RecoilRedutionAimingDown = snap.RecoilRedutionAimingDown end
+			if snap.RecoilRedution ~= nil then data.RecoilRedution = snap.RecoilRedution end
+		end)
+	end
+
+	local function applyToAll()
+		for _, mod in ipairs(getWeaponModules()) do
+			if noRecoilEnabled then
+				applyNoRecoil(mod)
+			else
+				restoreRecoil(mod)
+			end
+		end
+	end
+
+	local function setNoRecoilEnabled(on)
+		noRecoilEnabled = on
+		player:SetAttribute(ATTR_NO_RECOIL, on)
+		setRecoilSwitchVisual(on)
+		applyToAll()
+	end
+
+	setNoRecoilEnabled(noRecoilEnabled or false)
+	recoilSwitch.MouseButton1Click:Connect(function()
+		setNoRecoilEnabled(not noRecoilEnabled)
+	end)
+end
+
+-- [Misc logic] Silent gun toggle
+do
+	local ReplicatedStorage = game:GetService("ReplicatedStorage")
+	
+	local function setSilentSwitchVisual(isOn)
+		if isOn then
+			silentSwitch.BackgroundColor3 = Color3.fromRGB(90, 220, 255)
+			silentKnob:TweenPosition(UDim2.new(1, -27, 0.5, 0), Enum.EasingDirection.Out, Enum.EasingStyle.Quad, 0.15, true)
+			silentKnob.BackgroundColor3 = Color3.fromRGB(255, 105, 230)
+		else
+			silentSwitch.BackgroundColor3 = Color3.fromRGB(66, 47, 88)
+			silentKnob:TweenPosition(UDim2.new(0, 3, 0.5, 0), Enum.EasingDirection.Out, Enum.EasingStyle.Quad, 0.15, true)
+			silentKnob.BackgroundColor3 = Color3.fromRGB(145, 59, 167)
+		end
+	end
+
+	local ATTR_SILENT = "PT_SilentGun"
+	local silentEnabled = player:GetAttribute(ATTR_SILENT) == true
+	local originals = {}
+
+	local function getWeaponModules()
+		local assets = ReplicatedStorage:FindFirstChild("Assets")
+		if not assets then return {} end
+		local shared = assets:FindFirstChild("SharedData")
+		if not shared then return {} end
+		local settings = shared:FindFirstChild("WeaponSettings")
+		if not settings then return {} end
+		local firearms = settings:FindFirstChild("Firearms")
+		if not firearms then return {} end
+		
+		local mods = {}
+		for _, cat in ipairs(firearms:GetDescendants()) do
+			if cat:IsA("ModuleScript") then
+				table.insert(mods, cat)
+			end
+		end
+		return mods
+	end
+
+	local function captureOriginal(mod)
+		if originals[mod] then return end
+		local ok, data = pcall(function() return require(mod) end)
+		if not ok or type(data) ~= "table" then return end
+		originals[mod] = {
+			Silenced = data.Silenced,
+		}
+	end
+
+	local function applySilent(mod)
+		captureOriginal(mod)
+		local ok, data = pcall(function() return require(mod) end)
+		if not ok or type(data) ~= "table" then return end
+		pcall(function()
+			data.Silenced = true
+		end)
+	end
+
+	local function restoreSilent(mod)
+		local snap = originals[mod]
+		if not snap then return end
+		local ok, data = pcall(function() return require(mod) end)
+		if not ok or type(data) ~= "table" then return end
+		pcall(function()
+			if snap.Silenced ~= nil then data.Silenced = snap.Silenced end
+		end)
+	end
+
+	local function applyToAll()
+		for _, mod in ipairs(getWeaponModules()) do
+			if silentEnabled then
+				applySilent(mod)
+			else
+				restoreSilent(mod)
+			end
+		end
+	end
+
+	local function setSilentEnabled(on)
+		silentEnabled = on
+		player:SetAttribute(ATTR_SILENT, on)
+		setSilentSwitchVisual(on)
+		applyToAll()
+	end
+
+	setSilentEnabled(silentEnabled or false)
+silentSwitch.MouseButton1Click:Connect(function()
+	setSilentEnabled(not silentEnabled)
+end)
+end
+
+-- [Misc logic] Fast bullet toggle
+do
+	local ReplicatedStorage = game:GetService("ReplicatedStorage")
+	
+	local function setFastSwitchVisual(isOn)
+		if isOn then
+			fastSwitch.BackgroundColor3 = Color3.fromRGB(90, 220, 255)
+			fastKnob:TweenPosition(UDim2.new(1, -27, 0.5, 0), Enum.EasingDirection.Out, Enum.EasingStyle.Quad, 0.15, true)
+			fastKnob.BackgroundColor3 = Color3.fromRGB(255, 105, 230)
+		else
+			fastSwitch.BackgroundColor3 = Color3.fromRGB(66, 47, 88)
+			fastKnob:TweenPosition(UDim2.new(0, 3, 0.5, 0), Enum.EasingDirection.Out, Enum.EasingStyle.Quad, 0.15, true)
+			fastKnob.BackgroundColor3 = Color3.fromRGB(145, 59, 167)
+		end
+	end
+
+	local ATTR_FAST = "PT_FastBullet"
+	local fastEnabled = player:GetAttribute(ATTR_FAST) == true
+	local originals = {}
+
+	local function getWeaponModules()
+		local assets = ReplicatedStorage:FindFirstChild("Assets")
+		if not assets then return {} end
+		local shared = assets:FindFirstChild("SharedData")
+		if not shared then return {} end
+		local settings = shared:FindFirstChild("WeaponSettings")
+		if not settings then return {} end
+		local firearms = settings:FindFirstChild("Firearms")
+		if not firearms then return {} end
+		
+		local mods = {}
+		for _, cat in ipairs(firearms:GetDescendants()) do
+			if cat:IsA("ModuleScript") then
+				table.insert(mods, cat)
+			end
+		end
+		return mods
+	end
+
+	local function captureOriginal(mod)
+		if originals[mod] then return end
+		local ok, data = pcall(function() return require(mod) end)
+		if not ok or type(data) ~= "table" then return end
+		originals[mod] = {
+			ProjectileSpeed = data.ProjectileSpeed,
+		}
+	end
+
+	local function applyFast(mod)
+		captureOriginal(mod)
+		local ok, data = pcall(function() return require(mod) end)
+		if not ok or type(data) ~= "table" then return end
+		pcall(function()
+			data.ProjectileSpeed = 99999
+		end)
+	end
+
+	local function restoreFast(mod)
+		local snap = originals[mod]
+		if not snap then return end
+		local ok, data = pcall(function() return require(mod) end)
+		if not ok or type(data) ~= "table" then return end
+		pcall(function()
+			if snap.ProjectileSpeed ~= nil then data.ProjectileSpeed = snap.ProjectileSpeed end
+		end)
+	end
+
+	local function applyToAll()
+		for _, mod in ipairs(getWeaponModules()) do
+			if fastEnabled then
+				applyFast(mod)
+			else
+				restoreFast(mod)
+			end
+		end
+	end
+
+	local function setFastEnabled(on)
+		fastEnabled = on
+		player:SetAttribute(ATTR_FAST, on)
+		setFastSwitchVisual(on)
+		applyToAll()
+	end
+
+	setFastEnabled(fastEnabled or false)
+fastSwitch.MouseButton1Click:Connect(function()
+	setFastEnabled(not fastEnabled)
+	end)
+end
+
+-- [Misc logic] No equip CD toggle
+do
+	local ReplicatedStorage = game:GetService("ReplicatedStorage")
+	
+	local function setEquipSwitchVisual(isOn)
+		if isOn then
+			equipSwitch.BackgroundColor3 = Color3.fromRGB(90, 220, 255)
+			equipKnob:TweenPosition(UDim2.new(1, -27, 0.5, 0), Enum.EasingDirection.Out, Enum.EasingStyle.Quad, 0.15, true)
+			equipKnob.BackgroundColor3 = Color3.fromRGB(255, 105, 230)
+		else
+			equipSwitch.BackgroundColor3 = Color3.fromRGB(66, 47, 88)
+			equipKnob:TweenPosition(UDim2.new(0, 3, 0.5, 0), Enum.EasingDirection.Out, Enum.EasingStyle.Quad, 0.15, true)
+			equipKnob.BackgroundColor3 = Color3.fromRGB(145, 59, 167)
+		end
+	end
+
+	local ATTR_NO_EQUIP = "PT_NoEquipCD"
+	local noEquipEnabled = player:GetAttribute(ATTR_NO_EQUIP) == true
+	local originals = {}
+
+	local function getWeaponModules()
+		local assets = ReplicatedStorage:FindFirstChild("Assets")
+		if not assets then return {} end
+		local shared = assets:FindFirstChild("SharedData")
+		if not shared then return {} end
+		local settings = shared:FindFirstChild("WeaponSettings")
+		if not settings then return {} end
+		local firearms = settings:FindFirstChild("Firearms")
+		if not firearms then return {} end
+		
+		local mods = {}
+		for _, cat in ipairs(firearms:GetDescendants()) do
+			if cat:IsA("ModuleScript") then
+				table.insert(mods, cat)
+			end
+		end
+		return mods
+	end
+
+	local function captureOriginal(mod)
+		if originals[mod] then return end
+		local ok, data = pcall(function() return require(mod) end)
+		if not ok or type(data) ~= "table" then return end
+		originals[mod] = {
+			EquipCooldown = data.EquipCooldown,
+		}
+	end
+
+	local function applyNoEquip(mod)
+		captureOriginal(mod)
+		local ok, data = pcall(function() return require(mod) end)
+		if not ok or type(data) ~= "table" then return end
+		pcall(function()
+			data.EquipCooldown = 0
+		end)
+	end
+
+	local function restoreEquip(mod)
+		local snap = originals[mod]
+		if not snap then return end
+		local ok, data = pcall(function() return require(mod) end)
+		if not ok or type(data) ~= "table" then return end
+		pcall(function()
+			if snap.EquipCooldown ~= nil then data.EquipCooldown = snap.EquipCooldown end
+		end)
+	end
+
+	local function applyToAll()
+		for _, mod in ipairs(getWeaponModules()) do
+			if noEquipEnabled then
+				applyNoEquip(mod)
+			else
+				restoreEquip(mod)
+			end
+		end
+	end
+
+	local function setNoEquipEnabled(on)
+		noEquipEnabled = on
+		player:SetAttribute(ATTR_NO_EQUIP, on)
+		setEquipSwitchVisual(on)
+		applyToAll()
+	end
+
+	setNoEquipEnabled(noEquipEnabled or false)
+	equipSwitch.MouseButton1Click:Connect(function()
+		setNoEquipEnabled(not noEquipEnabled)
+	end)
+end
+
+-- [Misc logic] Full auto toggle
+do
+	local ReplicatedStorage = game:GetService("ReplicatedStorage")
+	
+	local function setAutoSwitchVisual(isOn)
+		if isOn then
+			autoSwitch.BackgroundColor3 = Color3.fromRGB(90, 220, 255)
+			autoKnob:TweenPosition(UDim2.new(1, -27, 0.5, 0), Enum.EasingDirection.Out, Enum.EasingStyle.Quad, 0.15, true)
+			autoKnob.BackgroundColor3 = Color3.fromRGB(255, 105, 230)
+		else
+			autoSwitch.BackgroundColor3 = Color3.fromRGB(66, 47, 88)
+			autoKnob:TweenPosition(UDim2.new(0, 3, 0.5, 0), Enum.EasingDirection.Out, Enum.EasingStyle.Quad, 0.15, true)
+			autoKnob.BackgroundColor3 = Color3.fromRGB(145, 59, 167)
+		end
+	end
+
+	local ATTR_FULL_AUTO = "PT_FullAuto"
+	local fullAutoEnabled = player:GetAttribute(ATTR_FULL_AUTO) == true
+	local originals = {}
+
+	local function getWeaponModules()
+		local assets = ReplicatedStorage:FindFirstChild("Assets")
+		if not assets then return {} end
+		local shared = assets:FindFirstChild("SharedData")
+		if not shared then return {} end
+		local settings = shared:FindFirstChild("WeaponSettings")
+		if not settings then return {} end
+		local firearms = settings:FindFirstChild("Firearms")
+		if not firearms then return {} end
+		
+		local mods = {}
+		for _, cat in ipairs(firearms:GetDescendants()) do
+			if cat:IsA("ModuleScript") then
+				table.insert(mods, cat)
+			end
+		end
+		return mods
+	end
+
+	local function captureOriginal(mod)
+		if originals[mod] then return end
+		local ok, data = pcall(function() return require(mod) end)
+		if not ok or type(data) ~= "table" then return end
+		originals[mod] = {
+			FullAutoFire = data.FullAutoFire,
+		}
+	end
+
+	local function applyFullAuto(mod)
+		captureOriginal(mod)
+		local ok, data = pcall(function() return require(mod) end)
+		if not ok or type(data) ~= "table" then return end
+		pcall(function()
+			data.FullAutoFire = true
+		end)
+	end
+
+	local function restoreFullAuto(mod)
+		local snap = originals[mod]
+		if not snap then return end
+		local ok, data = pcall(function() return require(mod) end)
+		if not ok or type(data) ~= "table" then return end
+		pcall(function()
+			if snap.FullAutoFire ~= nil then data.FullAutoFire = snap.FullAutoFire end
+		end)
+	end
+
+	local function applyToAll()
+		for _, mod in ipairs(getWeaponModules()) do
+			if fullAutoEnabled then
+				applyFullAuto(mod)
+			else
+				restoreFullAuto(mod)
+			end
+		end
+	end
+
+	local function setFullAutoEnabled(on)
+		fullAutoEnabled = on
+		player:SetAttribute(ATTR_FULL_AUTO, on)
+		setAutoSwitchVisual(on)
+		applyToAll()
+	end
+
+	setFullAutoEnabled(fullAutoEnabled or false)
+	autoSwitch.MouseButton1Click:Connect(function()
+		setFullAutoEnabled(not fullAutoEnabled)
+	end)
+end
+
+-- [Misc logic] Fast fire rate toggle
+do
+	local ReplicatedStorage = game:GetService("ReplicatedStorage")
+	
+	local function setFireRateSwitchVisual(isOn)
+		if isOn then
+			fireRateSwitch.BackgroundColor3 = Color3.fromRGB(90, 220, 255)
+			fireRateKnob:TweenPosition(UDim2.new(1, -27, 0.5, 0), Enum.EasingDirection.Out, Enum.EasingStyle.Quad, 0.15, true)
+			fireRateKnob.BackgroundColor3 = Color3.fromRGB(255, 105, 230)
+		else
+			fireRateSwitch.BackgroundColor3 = Color3.fromRGB(66, 47, 88)
+			fireRateKnob:TweenPosition(UDim2.new(0, 3, 0.5, 0), Enum.EasingDirection.Out, Enum.EasingStyle.Quad, 0.15, true)
+			fireRateKnob.BackgroundColor3 = Color3.fromRGB(145, 59, 167)
+		end
+	end
+
+	local ATTR_FAST_FIRE = "PT_FastFireRate"
+	local fastFireEnabled = player:GetAttribute(ATTR_FAST_FIRE) == true
+	local originals = {}
+
+	local function getWeaponModules()
+		local assets = ReplicatedStorage:FindFirstChild("Assets")
+		if not assets then return {} end
+		local shared = assets:FindFirstChild("SharedData")
+		if not shared then return {} end
+		local settings = shared:FindFirstChild("WeaponSettings")
+		if not settings then return {} end
+		local firearms = settings:FindFirstChild("Firearms")
+		if not firearms then return {} end
+		
+		local mods = {}
+		for _, cat in ipairs(firearms:GetDescendants()) do
+			if cat:IsA("ModuleScript") then
+				table.insert(mods, cat)
+			end
+		end
+		return mods
+	end
+
+	local function captureOriginal(mod)
+		if originals[mod] then return end
+		local ok, data = pcall(function() return require(mod) end)
+		if not ok or type(data) ~= "table" then return end
+		originals[mod] = {
+			FireDelay = data.FireDelay,
+		}
+	end
+
+	local function applyFastFire(mod)
+		captureOriginal(mod)
+		local ok, data = pcall(function() return require(mod) end)
+		if not ok or type(data) ~= "table" then return end
+		pcall(function()
+			data.FireDelay = 0
+		end)
+	end
+
+	local function restoreFire(mod)
+		local snap = originals[mod]
+		if not snap then return end
+		local ok, data = pcall(function() return require(mod) end)
+		if not ok or type(data) ~= "table" then return end
+		pcall(function()
+			if snap.FireDelay ~= nil then data.FireDelay = snap.FireDelay end
+		end)
+	end
+
+	local function applyToAll()
+		for _, mod in ipairs(getWeaponModules()) do
+			if fastFireEnabled then
+				applyFastFire(mod)
+			else
+				restoreFire(mod)
+			end
+		end
+	end
+
+	local function setFastFireEnabled(on)
+		fastFireEnabled = on
+		player:SetAttribute(ATTR_FAST_FIRE, on)
+		setFireRateSwitchVisual(on)
+		applyToAll()
+	end
+
+	setFastFireEnabled(fastFireEnabled or false)
+	fireRateSwitch.MouseButton1Click:Connect(function()
+		setFastFireEnabled(not fastFireEnabled)
+	end)
+end
+
 local pageShop  = makePage("ShopPage")
 
 -- Pages (add two more)
@@ -1306,6 +1911,112 @@ local function makeTrashButton(text)
 	return b
 end
 
+-- Encapsulated Trash logic
+local function setupTrashLogic()
+	local function getHazardsRoot()
+		local env = workspace:FindFirstChild("Environment")
+		if not env then return nil end
+		local inter = env:FindFirstChild("Interactable")
+		if not inter then return nil end
+		return inter:FindFirstChild("Hazards")
+	end
+
+	local function tpToModelTrash(m)
+		if not m or not m:IsA("Model") then return end
+		local char = player.Character or player.CharacterAdded:Wait()
+		if not char then return end
+		local cf
+		local ok, pivot = pcall(function() return m:GetPivot() end)
+		if ok then cf = pivot
+		elseif m.PrimaryPart then cf = m.PrimaryPart.CFrame
+		else
+			local p = m:FindFirstChildWhichIsA("BasePart", true)
+			if p then cf = p.CFrame end
+		end
+		if not cf then return end
+		char:PivotTo(cf * CFrame.new(0, 4, 0))
+	end
+
+	local trashButtons   = {}  -- [Model] = TextButton
+	local trashNameConn  = {}  -- [Model] = RBXScriptConnection
+	local hazardsConns   = {}  -- { RBXScriptConnection }
+	local observedHazards = nil
+
+	local function removeTrashModel(m)
+		local b = trashButtons[m]
+		if b then b:Destroy() end
+		trashButtons[m] = nil
+		if trashNameConn[m] then trashNameConn[m]:Disconnect() trashNameConn[m] = nil end
+	end
+
+	local function addTrashModel(m)
+		-- Only accept models explicitly named "Trash Can"
+		if not (m and m:IsA("Model") and m.Name == "Trash Can") then return end
+		if trashButtons[m] then return end
+		local b = makeTrashButton(m.Name)
+		b.Parent = trashList
+		trashButtons[m] = b
+		b.MouseButton1Click:Connect(function() tpToModelTrash(m) end)
+		trashNameConn[m] = m:GetPropertyChangedSignal("Name"):Connect(function()
+			if m.Name ~= "Trash Can" then
+				removeTrashModel(m)
+			else
+				local btn = trashButtons[m]
+				if btn then btn.Name = m.Name; btn.Text = m.Name end
+			end
+		end)
+	end
+
+	local function clearTrash()
+		for m,_ in pairs(trashButtons) do removeTrashModel(m) end
+	end
+
+	local function populateTrashDirect(root)
+		clearTrash()
+		if not root then return end
+		for _, child in ipairs(root:GetChildren()) do
+			addTrashModel(child)
+		end
+	end
+
+	local function disconnectHazardsWatch()
+		for _, c in ipairs(hazardsConns) do if c then c:Disconnect() end end
+		hazardsConns = {}
+		observedHazards = nil
+	end
+
+	local function attachHazardsWatch(root)
+		disconnectHazardsWatch()
+		if not root then return end
+		observedHazards = root
+		populateTrashDirect(root)
+		table.insert(hazardsConns, root.ChildAdded:Connect(function(inst)
+			addTrashModel(inst)
+		end))
+		table.insert(hazardsConns, root.ChildRemoved:Connect(function(inst)
+			if trashButtons[inst] then removeTrashModel(inst) end
+		end))
+		table.insert(hazardsConns, root.AncestryChanged:Connect(function(_, parent)
+			if not parent then disconnectHazardsWatch() end
+		end))
+	end
+
+	-- Rebind if Hazards is recreated; keeps list accurate
+	task.spawn(function()
+		local last
+		while pageTrash.Parent do
+			local root = getHazardsRoot()
+			if root ~= last then
+				attachHazardsWatch(root)
+				last = root
+			end
+			task.wait(1.0)
+		end
+	end)
+end
+
+setupTrashLogic()
+
 -- [Crates UI]
 local cratesList = Instance.new("ScrollingFrame")
 cratesList.Name = "CratesList"
@@ -1346,6 +2057,100 @@ local function makeCrateButton(text)
 	b.MouseLeave:Connect(function() b.BackgroundColor3 = Color3.fromRGB(145, 59, 167) s.Transparency = 0.6 end)
 	return b
 end
+
+-- Encapsulated Crates logic
+local function setupCratesLogic()
+	local function tpToModelCrate(m)
+	if not m or not m:IsA("Model") then return end
+	local char = player.Character or player.CharacterAdded:Wait()
+	if not char then return end
+	local cf
+	local ok, pivot = pcall(function() return m:GetPivot() end)
+	if ok then cf = pivot
+	elseif m.PrimaryPart then cf = m.PrimaryPart.CFrame
+	else
+		local p = m:FindFirstChildWhichIsA("BasePart", true)
+		if p then cf = p.CFrame end
+	end
+	if not cf then return end
+	char:PivotTo(cf * CFrame.new(0, 4, 0))
+end
+
+	local crateButtons = {}  -- [Model] = TextButton
+	local crateNameConn = {}  -- [Model] = RBXScriptConnection
+	local crateConns = {}  -- { RBXScriptConnection }
+
+	local function addCrate(m)
+	if crateButtons[m] then return end
+	if m.Name ~= "Military Crate" then return end
+	local b = makeCrateButton(m.Name)
+	b.Parent = cratesList
+	crateButtons[m] = b
+	b.MouseButton1Click:Connect(function() tpToModelCrate(m) end)
+	crateNameConn[m] = m:GetPropertyChangedSignal("Name"):Connect(function()
+		if m.Name ~= "Military Crate" then
+			local btn = crateButtons[m]; if btn then btn:Destroy() end
+			crateButtons[m] = nil
+			if crateNameConn[m] then crateNameConn[m]:Disconnect() crateNameConn[m] = nil end
+		else
+			local btn = crateButtons[m]; if btn then btn.Name = m.Name; btn.Text = m.Name end
+		end
+	end)
+end
+
+	local function removeCrate(m)
+	local b = crateButtons[m]
+	if b then b:Destroy() end
+	crateButtons[m] = nil
+	if crateNameConn[m] then crateNameConn[m]:Disconnect() crateNameConn[m] = nil end
+end
+
+local function clearCrates()
+	for m,_ in pairs(crateButtons) do removeCrate(m) end
+end
+
+local function populateCratesAll()
+	clearCrates()
+	for _, inst in ipairs(workspace:GetDescendants()) do
+		if inst:IsA("Model") and inst.Name == "Military Crate" then
+			addCrate(inst)
+		end
+	end
+end
+
+local function disconnectCrateWatchers()
+	for _, c in ipairs(crateConns) do if c then c:Disconnect() end end
+	crateConns = {}
+end
+
+local function attachCrateWatchers()
+	disconnectCrateWatchers()
+	populateCratesAll()
+	table.insert(crateConns, workspace.DescendantAdded:Connect(function(inst)
+		if inst:IsA("Model") and inst.Name == "Military Crate" then
+			addCrate(inst)
+		end
+	end))
+	table.insert(crateConns, workspace.DescendantRemoving:Connect(function(inst)
+		if crateButtons[inst] then removeCrate(inst) end
+	end))
+	-- Light poll to catch rare renames to "Military Crate"
+	task.spawn(function()
+		while pageCrates.Parent do
+			for _, inst in ipairs(workspace:GetDescendants()) do
+				if inst:IsA("Model") and inst.Name == "Military Crate" then
+					if not crateButtons[inst] then addCrate(inst) end
+				end
+			end
+			task.wait(2.0)
+		end
+	end)
+end
+
+attachCrateWatchers()
+end
+
+setupCratesLogic()
 
 -- [Shop UI] simple vertical list
 local shopList = Instance.new("ScrollingFrame")
@@ -1388,215 +2193,8 @@ local function makeShopButton(text)
 	return b
 end
 
--- Replace your existing tabList/pageList with these:
-local pageList  = {pageItems, pageAmmo, pageMisc, pageShop, pageCrates, pageTrash}
-
--- [Crates logic] Any Model named "Military Crate" in the entire workspace
-local function tpToModelCrate(m: Instance)
-	if not m or not m:IsA("Model") then return end
-	local char = player.Character or player.CharacterAdded:Wait()
-	if not char then return end
-	local cf
-	local ok, pivot = pcall(function() return m:GetPivot() end)
-	if ok then cf = pivot
-	elseif m.PrimaryPart then cf = m.PrimaryPart.CFrame
-	else
-		local p = m:FindFirstChildWhichIsA("BasePart", true)
-		if p then cf = p.CFrame end
-	end
-	if not cf then return end
-	char:PivotTo(cf * CFrame.new(0, 4, 0))
-end
-
-local crateButtons: { [Model]: TextButton } = {}
-local crateNameConn: { [Model]: RBXScriptConnection } = {}
-local crateConns: { RBXScriptConnection } = {}
-
-local function addCrate(m: Model)
-	if crateButtons[m] then return end
-	if m.Name ~= "Military Crate" then return end
-	local b = makeCrateButton(m.Name)
-	b.Parent = cratesList
-	crateButtons[m] = b
-	b.MouseButton1Click:Connect(function() tpToModelCrate(m) end)
-	-- If it gets renamed away, remove it
-	crateNameConn[m] = m:GetPropertyChangedSignal("Name"):Connect(function()
-		if m.Name ~= "Military Crate" then
-			local btn = crateButtons[m]; if btn then btn:Destroy() end
-			crateButtons[m] = nil
-			if crateNameConn[m] then crateNameConn[m]:Disconnect() crateNameConn[m] = nil end
-		else
-			local btn = crateButtons[m]; if btn then btn.Name = m.Name; btn.Text = m.Name end
-		end
-	end)
-end
-
-local function removeCrate(m: Model)
-	local b = crateButtons[m]
-	if b then b:Destroy() end
-	crateButtons[m] = nil
-	if crateNameConn[m] then crateNameConn[m]:Disconnect() crateNameConn[m] = nil end
-end
-
-local function clearCrates()
-	for m,_ in pairs(crateButtons) do removeCrate(m) end
-end
-
-local function populateCratesAll()
-	clearCrates()
-	for _, inst in ipairs(workspace:GetDescendants()) do
-		if inst:IsA("Model") and inst.Name == "Military Crate" then
-			addCrate(inst)
-		end
-	end
-end
-
-local function disconnectCrateWatchers()
-	for _, c in ipairs(crateConns) do if c then c:Disconnect() end end
-	crateConns = {}
-end
-
-local function attachCrateWatchers()
-	disconnectCrateWatchers()
-	populateCratesAll()
-
-	table.insert(crateConns, workspace.DescendantAdded:Connect(function(inst)
-		if inst:IsA("Model") and inst.Name == "Military Crate" then
-			addCrate(inst)
-		end
-	end))
-	table.insert(crateConns, workspace.DescendantRemoving:Connect(function(inst)
-		if crateButtons[inst] then removeCrate(inst) end
-	end))
-
-	-- Light poll to catch rare renames to "Military Crate"
-	task.spawn(function()
-		while pageCrates.Parent do
-			for _, inst in ipairs(workspace:GetDescendants()) do
-				if inst:IsA("Model") and inst.Name == "Military Crate" then
-					if not crateButtons[inst] then addCrate(inst) end
-				end
-			end
-			task.wait(2.0)
-		end
-	end)
-end
-
-attachCrateWatchers()
-
--- [Trash logic — only direct children named "Trash Can"]
-local function getHazardsRoot()
-	local env = workspace:FindFirstChild("Environment")
-	if not env then return nil end
-	local inter = env:FindFirstChild("Interactable")
-	if not inter then return nil end
-	return inter:FindFirstChild("Hazards")
-end
-
-local function tpToModelTrash(m)
-	if not m or not m:IsA("Model") then return end
-	local char = player.Character or player.CharacterAdded:Wait()
-	if not char then return end
-	local cf
-	local ok, pivot = pcall(function() return m:GetPivot() end)
-	if ok then cf = pivot
-	elseif m.PrimaryPart then cf = m.PrimaryPart.CFrame
-	else
-		local p = m:FindFirstChildWhichIsA("BasePart", true)
-		if p then cf = p.CFrame end
-	end
-	if not cf then return end
-	char:PivotTo(cf * CFrame.new(0, 4, 0))
-end
-
-local trashButtons   = {}  -- [Model] = TextButton
-local trashNameConn  = {}  -- [Model] = RBXScriptConnection
-local hazardsConns   = {}  -- { RBXScriptConnection }
-local observedHazards = nil
-
-local function removeTrashModel(m)
-	local b = trashButtons[m]
-	if b then b:Destroy() end
-	trashButtons[m] = nil
-	if trashNameConn[m] then trashNameConn[m]:Disconnect() trashNameConn[m] = nil end
-end
-
-local function addTrashModel(m)
-	-- Only accept models explicitly named "Trash Can"
-	if not (m and m:IsA("Model") and m.Name == "Trash Can") then return end
-	if trashButtons[m] then return end
-
-	local b = makeTrashButton(m.Name)
-	b.Parent = trashList
-	trashButtons[m] = b
-
-	b.MouseButton1Click:Connect(function()
-		tpToModelTrash(m)
-	end)
-
-	-- If it gets renamed away from "Trash Can", remove it from the list
-	trashNameConn[m] = m:GetPropertyChangedSignal("Name"):Connect(function()
-		if m.Name ~= "Trash Can" then
-			removeTrashModel(m)
-		else
-			local btn = trashButtons[m]
-			if btn then btn.Name = m.Name; btn.Text = m.Name end
-		end
-	end)
-end
-
-local function clearTrash()
-	for m,_ in pairs(trashButtons) do removeTrashModel(m) end
-end
-
--- Populate ONLY direct children that are Models named "Trash Can"
-local function populateTrashDirect(root)
-	clearTrash()
-	if not root then return end
-	for _, child in ipairs(root:GetChildren()) do
-		addTrashModel(child)
-	end
-end
-
-local function disconnectHazardsWatch()
-	for _, c in ipairs(hazardsConns) do if c then c:Disconnect() end end
-	hazardsConns = {}
-	observedHazards = nil
-end
-
-local function attachHazardsWatch(root)
-	disconnectHazardsWatch()
-	if not root then return end
-	observedHazards = root
-
-	populateTrashDirect(root)
-
-	-- Only watch direct children (no descendants)
-	table.insert(hazardsConns, root.ChildAdded:Connect(function(inst)
-		addTrashModel(inst)
-	end))
-	table.insert(hazardsConns, root.ChildRemoved:Connect(function(inst)
-		if trashButtons[inst] then removeTrashModel(inst) end
-	end))
-	table.insert(hazardsConns, root.AncestryChanged:Connect(function(_, parent)
-		if not parent then disconnectHazardsWatch() end
-	end))
-end
-
--- Rebind if Hazards is recreated; keeps list accurate
-task.spawn(function()
-	local last
-	while pageTrash.Parent do
-		local root = getHazardsRoot()
-		if root ~= last then
-			attachHazardsWatch(root)
-			last = root
-		end
-		task.wait(1.0)
-	end
-end)
-
--- [Shop logic — direct children only]
+-- Encapsulated Shop logic
+local function setupShopLogic()
 local function getVendorsRoot()
 	local env = workspace:FindFirstChild("Environment")
 	if not env then return nil end
@@ -1621,7 +2219,6 @@ local function tpToModel(m)
 	char:PivotTo(cf * CFrame.new(0, 4, 0))
 end
 
--- Storage
 local shopButtons = {}          -- [Model] = TextButton
 local shopNameConn = {}         -- [Model] = RBXScriptConnection
 local vendorsConns = {}         -- { RBXScriptConnection }
@@ -1650,7 +2247,6 @@ local function clearVendors()
 	for m,_ in pairs(shopButtons) do removeVendorModel(m) end
 end
 
--- Populate ONLY direct children that are Models
 local function populateVendors(root)
 	clearVendors()
 	if not root then return end
@@ -1671,22 +2267,16 @@ local function attachVendorsWatch(root)
 	disconnectVendorsWatch()
 	if not root then return end
 	observedVendors = root
-
 	populateVendors(root)
-
-	-- Only watch direct children (no descendants)
 	table.insert(vendorsConns, root.ChildAdded:Connect(function(inst)
 		if inst:IsA("Model") then addVendorModel(inst) end
 	end))
 	table.insert(vendorsConns, root.ChildRemoved:Connect(function(inst)
 		if shopButtons[inst] then removeVendorModel(inst) end
 	end))
-	table.insert(vendorsConns, root.AncestryChanged:Connect(function(_, parent)
-		if not parent then disconnectVendorsWatch() end
-	end))
 end
 
--- Rebind if Vendors is recreated; keeps the list current
+	-- Rebind if Vendors is recreated; keeps list accurate
 task.spawn(function()
 	local last
 	while pageShop.Parent do
@@ -1698,6 +2288,12 @@ task.spawn(function()
 		task.wait(1.0)
 	end
 end)
+end
+
+setupShopLogic()
+
+-- Replace your existing tabList/pageList with these:
+local pageList  = {pageItems, pageAmmo, pageMisc, pageShop, pageCrates, pageTrash}
 
 -- Initial selection
 local currentIndex = 1
@@ -1762,11 +2358,12 @@ tabTrash.MouseButton1Click:Connect(function()  slideTo(6) end)
 ----------------------------------------------------------------------
 -- Dragging (drag the title bar; clicking tabs won't drag)
 ----------------------------------------------------------------------
-local dragging, dragStart, startPos, dragInput
-local function pointIn(obj, p)
-	local pos, size = obj.AbsolutePosition, obj.AbsoluteSize
-	return p.X >= pos.X and p.X <= pos.X + size.X and p.Y >= pos.Y and p.Y <= pos.Y + size.Y
-end
+do
+	local drag = {dragging = false, dragStart = nil, startPos = nil, dragInput = nil}
+	local function pointIn(obj, p)
+		local pos, size = obj.AbsolutePosition, obj.AbsoluteSize
+		return p.X >= pos.X and p.X <= pos.X + size.X and p.Y >= pos.Y and p.Y <= pos.Y + size.Y
+	end
 
 titleBar.InputBegan:Connect(function(input)
 	if input.UserInputType ~= Enum.UserInputType.MouseButton1 and input.UserInputType ~= Enum.UserInputType.Touch then
@@ -1777,77 +2374,80 @@ titleBar.InputBegan:Connect(function(input)
 			return
 		end
 	end
-	dragging = true
-	dragStart = input.Position
-	startPos = win.Position
+	drag.dragging = true
+	drag.dragStart = input.Position
+	drag.startPos = win.Position
 	input.Changed:Connect(function()
-		if input.UserInputState == Enum.UserInputState.End then dragging = false end
+		if input.UserInputState == Enum.UserInputState.End then drag.dragging = false end
 	end)
 end)
 
 titleBar.InputChanged:Connect(function(input)
 	if input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch then
-		dragInput = input
+		drag.dragInput = input
 	end
 end)
 
 UIS.InputChanged:Connect(function(input)
-	if input == dragInput and dragging then
-		local delta = input.Position - dragStart
-		win.Position = UDim2.new(startPos.X.Scale, startPos.X.Offset + delta.X, startPos.Y.Scale, startPos.Y.Offset + delta.Y)
+	if input == drag.dragInput and drag.dragging then
+		local delta = input.Position - drag.dragStart
+		win.Position = UDim2.new(drag.startPos.X.Scale, drag.startPos.X.Offset + delta.X, drag.startPos.Y.Scale, drag.startPos.Y.Offset + delta.Y)
 	end
 end)
+end
 
 ----------------------------------------------------------------------
 -- Left Control: modern zoom-fade toggle (minimize/restore)
 ----------------------------------------------------------------------
-local scale = Instance.new("UIScale")
-scale.Scale = 1
-scale.Parent = win
-
-local fader = Instance.new("Frame")
-fader.BackgroundColor3 = Color3.fromRGB(18, 6, 28)
-fader.BackgroundTransparency = 1
-fader.BorderSizePixel = 0
-fader.Size = UDim2.fromScale(1,1)
-fader.ZIndex = 999
-fader.Parent = win
-corner(fader, 14)
-
-homePos = win.Position
-isOpen, animLock, windowReady = false, false, false
+local anim = {
+	scale = Instance.new("UIScale"),
+	fader = Instance.new("Frame"),
+	homePos = win.Position,
+	isOpen = false,
+	animLock = false,
+	windowReady = false
+}
+anim.scale.Scale = 1
+anim.scale.Parent = win
+anim.fader.BackgroundColor3 = Color3.fromRGB(18, 6, 28)
+anim.fader.BackgroundTransparency = 1
+anim.fader.BorderSizePixel = 0
+anim.fader.Size = UDim2.fromScale(1,1)
+anim.fader.ZIndex = 999
+anim.fader.Parent = win
+corner(anim.fader, 14)
 
 function openWindow()
-	if animLock or isOpen or not windowReady then return end
-	animLock = true
+	if anim.animLock or anim.isOpen or not anim.windowReady then return end
+	anim.animLock = true
 	win.Visible = true
-	scale.Scale = 0.96
-	fader.BackgroundTransparency = 0
-	win.Position = homePos + UDim2.fromOffset(0, 8)
+	anim.scale.Scale = 0.96
+	anim.fader.BackgroundTransparency = 0
+	win.Position = anim.homePos + UDim2.fromOffset(0, 8)
 
-	tween(fader, TweenInfo.new(0.28, Enum.EasingStyle.Sine, Enum.EasingDirection.Out), {BackgroundTransparency = 1})
-	tween(win,   TweenInfo.new(0.26, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {Position = homePos})
-	local up = tween(scale, TweenInfo.new(0.16, Enum.EasingStyle.Quint, Enum.EasingDirection.Out), {Scale = 1.03})
+	tween(anim.fader, TweenInfo.new(0.28, Enum.EasingStyle.Sine, Enum.EasingDirection.Out), {BackgroundTransparency = 1})
+	tween(win,   TweenInfo.new(0.26, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {Position = anim.homePos})
+	local up = tween(anim.scale, TweenInfo.new(0.16, Enum.EasingStyle.Quint, Enum.EasingDirection.Out), {Scale = 1.03})
 	up.Completed:Wait()
-	tween(scale, TweenInfo.new(0.12, Enum.EasingStyle.Sine, Enum.EasingDirection.In), {Scale = 1})
+	tween(anim.scale, TweenInfo.new(0.12, Enum.EasingStyle.Sine, Enum.EasingDirection.In), {Scale = 1})
 
-	isOpen, animLock = true, false
+	anim.isOpen, anim.animLock = true, false
 end
 
 function closeWindow()
-	if animLock or not isOpen or not windowReady then return end
-	animLock = true
-	tween(fader, TweenInfo.new(0.20, Enum.EasingStyle.Sine, Enum.EasingDirection.In), {BackgroundTransparency = 0})
-	tween(win,   TweenInfo.new(0.24, Enum.EasingStyle.Quad, Enum.EasingDirection.In), {Position = homePos + UDim2.fromOffset(0, 8)})
-	local down = tween(scale, TweenInfo.new(0.24, Enum.EasingStyle.Quint, Enum.EasingDirection.In), {Scale = 0.94})
+	if anim.animLock or not anim.isOpen or not anim.windowReady then return end
+	anim.animLock = true
+	tween(anim.fader, TweenInfo.new(0.20, Enum.EasingStyle.Sine, Enum.EasingDirection.In), {BackgroundTransparency = 0})
+	tween(win,   TweenInfo.new(0.24, Enum.EasingStyle.Quad, Enum.EasingDirection.In), {Position = anim.homePos + UDim2.fromOffset(0, 8)})
+	local down = tween(anim.scale, TweenInfo.new(0.24, Enum.EasingStyle.Quint, Enum.EasingDirection.In), {Scale = 0.94})
 	down.Completed:Wait()
 	win.Visible = false
-	isOpen, animLock = false, false
+	anim.isOpen, anim.animLock = false, false
 end
 
 function toggleWindow()
-	if not windowReady then return end
-	if isOpen then closeWindow() else openWindow() end
+	if not anim.windowReady then return end
+	if anim.isOpen then closeWindow() else openWindow() end
 end
 
 -- Replace the old LeftControl handler with this N-key handler.
@@ -1868,7 +2468,7 @@ end)
 ----------------------------------------------------------------------
 -- Full-screen cinematic intro (covers CoreGui). Includes one-time SFX.
 ----------------------------------------------------------------------
-local function safeSetCoreAll(enabled)
+function safeSetCoreAll(enabled)
 	for i = 1, 40 do
 		local ok1 = pcall(function() StarterGui:SetCoreGuiEnabled(Enum.CoreGuiType.All, enabled) end)
 		local ok2 = pcall(function() StarterGui:SetCore("TopbarEnabled", enabled) end)
@@ -2038,9 +2638,9 @@ function playStunningIntro()
 
 	-- Reveal the main GUI and arm the toggle
 	win.Visible = true
-	homePos = win.Position
-	isOpen = true
-	windowReady = true
+	anim.homePos = win.Position
+	anim.isOpen = true
+	anim.windowReady = true
 end
 
 -- Run the intro (sound plays once here)
