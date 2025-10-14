@@ -172,7 +172,7 @@ end
 -- ScreenGui for the main app (persists across respawn)
 ----------------------------------------------------------------------
 local gui = Instance.new("ScreenGui")
-gui.Name = "PT Hack :3"
+gui.Name = "TransfurWare"
 gui.ResetOnSpawn = false       -- IMPORTANT: keep GUI through death/respawn
 gui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
 pcall(function()
@@ -340,7 +340,7 @@ end)
 
 local title = Instance.new("TextLabel")
 title.BackgroundTransparency = 1
-title.Text = "PT Hack :3"
+title.Text = "TransfurWare"
 title.Font = Enum.Font.GothamBold
 title.TextSize = 18
 title.TextColor3 = WHITE
