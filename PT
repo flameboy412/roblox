@@ -59,8 +59,8 @@ local function sendIntroNotification()
 	for i = 1, 30 do
 		local ok = pcall(function()
 			game:GetService("StarterGui"):SetCore("SendNotification", {
-				Title    = "PT Hack :3",
-				Text     = "Script made by: ilovegay1113",
+				Title    = "TransfurWare",
+				Text     = "Script made by: ilovegay1113 on Discord",
 				Duration = 6,
 				-- Icon = "rbxassetid://<optionalIconId>"
 			})
@@ -194,7 +194,88 @@ win.BorderSizePixel = 0
 win.Visible = false -- revealed after intro
 win.Parent = gui
 corner(win, 14)
-stroke(win, Color3.fromRGB(200,120,255), 1.2, 0.5)
+
+-- Enhanced stroke with glow effect
+local winStroke = stroke(win, Color3.fromRGB(200,120,255), 1.5, 0.3)
+
+-- Pulsing glow effect on window border
+task.spawn(function()
+	while win.Parent do
+		tween(winStroke, TweenInfo.new(2, Enum.EasingStyle.Sine, Enum.EasingDirection.InOut), 
+			{Transparency = 0.15, Color = Color3.fromRGB(220, 140, 255)})
+		task.wait(2)
+		tween(winStroke, TweenInfo.new(2, Enum.EasingStyle.Sine, Enum.EasingDirection.InOut), 
+			{Transparency = 0.4, Color = Color3.fromRGB(170, 100, 220)})
+		task.wait(2)
+	end
+end)
+
+-- Animated gradient background
+local winGrad = Instance.new("UIGradient")
+winGrad.Color = ColorSequence.new{
+	ColorSequenceKeypoint.new(0.00, Color3.fromRGB(55, 25, 70)),
+	ColorSequenceKeypoint.new(0.50, Color3.fromRGB(43, 18, 56)),
+	ColorSequenceKeypoint.new(1.00, Color3.fromRGB(30, 12, 45))
+}
+winGrad.Rotation = 135
+winGrad.Parent = win
+
+-- Animate the gradient rotation (lighter on CPU)
+-- Use TweenService instead of per-frame loop
+task.spawn(function()
+    local ROT_DUR = 6 -- seconds for full rotation
+    while win.Parent do
+        -- Rotate 360 degrees from current rotation
+        local newRot = (winGrad.Rotation + 360) % 360
+        local tw = tween(winGrad, TweenInfo.new(ROT_DUR, Enum.EasingStyle.Sine, Enum.EasingDirection.InOut, 0, false), {Rotation = newRot})
+        tw.Completed:Wait()
+    end
+end)
+
+-- Corner accent lights
+local function createCornerLight(anchorX, anchorY, posX, posY)
+	local light = Instance.new("Frame")
+	light.AnchorPoint = Vector2.new(anchorX, anchorY)
+	light.Position = UDim2.new(posX, 0, posY, 0)
+	light.Size = UDim2.fromOffset(40, 40)
+	light.BackgroundColor3 = MAGENTA
+	light.BackgroundTransparency = 0.7
+	light.BorderSizePixel = 0
+	light.ZIndex = 0
+	light.Parent = win
+	
+	local lightGrad = Instance.new("UIGradient")
+	lightGrad.Color = ColorSequence.new{
+		ColorSequenceKeypoint.new(0, MAGENTA),
+		ColorSequenceKeypoint.new(1, CYAN)
+	}
+	lightGrad.Transparency = NumberSequence.new{
+		NumberSequenceKeypoint.new(0, 0.3),
+		NumberSequenceKeypoint.new(1, 1)
+	}
+	lightGrad.Parent = light
+	corner(light, 40)
+	
+	-- Pulse animation
+	task.spawn(function()
+		task.wait(math.random())
+		while light.Parent do
+			tween(light, TweenInfo.new(1.5, Enum.EasingStyle.Sine, Enum.EasingDirection.InOut), 
+				{Size = UDim2.fromOffset(50, 50), BackgroundTransparency = 0.5})
+			task.wait(1.5)
+			tween(light, TweenInfo.new(1.5, Enum.EasingStyle.Sine, Enum.EasingDirection.InOut), 
+				{Size = UDim2.fromOffset(40, 40), BackgroundTransparency = 0.7})
+			task.wait(1.5)
+		end
+	end)
+	
+	return light
+end
+
+createCornerLight(0, 0, 0, 0)     -- Top-left
+createCornerLight(1, 0, 1, 0)     -- Top-right
+createCornerLight(0, 1, 0, 1)     -- Bottom-left
+createCornerLight(1, 1, 1, 1)     -- Bottom-right
 
 -- Inner container for consistent spacing
 local container = Instance.new("Frame")
@@ -214,7 +295,48 @@ titleBar.Size = UDim2.new(1, 0, 0, 48)
 titleBar.Active = true
 titleBar.Parent = container
 corner(titleBar, 10)
-stroke(titleBar, Color3.fromRGB(255,160,255), 1, 0.6)
+stroke(titleBar, Color3.fromRGB(255,160,255), 1, 0.4)
+
+-- Gradient overlay for title bar
+local titleGrad = Instance.new("UIGradient")
+titleGrad.Color = ColorSequence.new{
+	ColorSequenceKeypoint.new(0.0, Color3.fromRGB(75, 50, 95)),
+	ColorSequenceKeypoint.new(0.5, Color3.fromRGB(66, 47, 88)),
+	ColorSequenceKeypoint.new(1.0, Color3.fromRGB(55, 40, 75))
+}
+titleGrad.Rotation = 90
+titleGrad.Parent = titleBar
+
+-- Shimmer effect overlay
+local shimmer = Instance.new("Frame")
+shimmer.Name = "Shimmer"
+shimmer.BackgroundColor3 = Color3.new(1,1,1)
+shimmer.BackgroundTransparency = 0.85
+shimmer.BorderSizePixel = 0
+shimmer.Size = UDim2.new(0.3, 0, 1, 0)
+shimmer.Position = UDim2.new(-0.3, 0, 0, 0)
+shimmer.ZIndex = 2
+shimmer.Parent = titleBar
+
+local shimmerGrad = Instance.new("UIGradient")
+shimmerGrad.Transparency = NumberSequence.new{
+	NumberSequenceKeypoint.new(0, 1),
+	NumberSequenceKeypoint.new(0.5, 0),
+	NumberSequenceKeypoint.new(1, 1)
+}
+shimmerGrad.Rotation = 90
+shimmerGrad.Parent = shimmer
+
+-- Animate shimmer
+task.spawn(function()
+	while titleBar.Parent do
+		tween(shimmer, TweenInfo.new(3, Enum.EasingStyle.Sine, Enum.EasingDirection.InOut), 
+			{Position = UDim2.new(1, 0, 0, 0)})
+		task.wait(3)
+		shimmer.Position = UDim2.new(-0.3, 0, 0, 0)
+		task.wait(2)
+	end
+end)
 
 local title = Instance.new("TextLabel")
 title.BackgroundTransparency = 1
@@ -224,8 +346,9 @@ title.TextSize = 18
 title.TextColor3 = WHITE
 title.TextXAlignment = Enum.TextXAlignment.Left
 title.Size = UDim2.new(1, -PAD*2, 1, 0)
-title.Position = UDim2.new(0, PAD, 0, 0)
-title.Parent = titleBar
+  title.Position = UDim2.new(0, PAD, 0, 0)
+  title.Parent = titleBar
+
 
 ----------------------------------------------------------------------
 -- Tabs row with horizontal scrolling (replaces your tabsStrip Frame block)
@@ -266,6 +389,11 @@ tabsLayout.VerticalAlignment = Enum.VerticalAlignment.Center
 tabsLayout.SortOrder = Enum.SortOrder.LayoutOrder
 tabsLayout.Padding = UDim.new(0, TAB_GAP)
 
+-- Forward declarations to satisfy analyzers and allow cross-references
+local tabList -- list of tab buttons (filled later)
+local pageList -- list of pages (filled later)
+local currentIndex -- active tab index (set later)
+
 local function makeTab(label, order)
 	local b = Instance.new("TextButton")
 	b.Name = label
@@ -301,8 +429,31 @@ local function makeTab(label, order)
 
 	b.MouseEnter:Connect(function()
 		tween(b, TweenInfo.new(0.15), {BackgroundColor3 = TAB_SEL})
+		-- Spawn small sparkles on hover
+		for i = 1, 3 do
+			local spark = Instance.new("Frame")
+			spark.AnchorPoint = Vector2.new(0.5, 0.5)
+			spark.Position = UDim2.fromScale(math.random() * 0.8 + 0.1, 0.5)
+			spark.Size = UDim2.fromOffset(4, 4)
+			spark.BackgroundColor3 = i % 2 == 0 and CYAN or MAGENTA
+			spark.BackgroundTransparency = 0.3
+			spark.BorderSizePixel = 0
+			spark.ZIndex = 10
+			spark.Parent = b
+			corner(spark, 4)
+			
+			local t = tween(spark, TweenInfo.new(0.5, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), 
+				{Position = UDim2.new(spark.Position.X.Scale, 0, -0.5, 0), 
+				 BackgroundTransparency = 1, 
+				 Size = UDim2.fromOffset(0, 0)})
+			t.Completed:Connect(function() spark:Destroy() end)
+		end
 	end)
-	b.MouseLeave:Connect(function() end)
+	b.MouseLeave:Connect(function()
+		if tabList[currentIndex] ~= b then
+			tween(b, TweenInfo.new(0.15), {BackgroundColor3 = TAB})
+		end
+	end)
 
 	return b
 end
@@ -315,8 +466,9 @@ local tabShop  = makeTab("Shop",  4)
 -- Tabs (add two more)
 local tabCrates = makeTab("Crates", 5)
 local tabTrash  = makeTab("Trash",  6)
+local tabMods   = makeTab("Mods",   7)
 
-local tabList  = {tabItems, tabAmmo, tabMisc, tabShop, tabCrates, tabTrash}
+tabList  = {tabItems, tabAmmo, tabMisc, tabShop, tabCrates, tabTrash, tabMods}
 
 ----------------------------------------------------------------------
 -- Content area fills remaining space
@@ -333,14 +485,103 @@ pages.Parent = container
 corner(pages, 10)
 stroke(pages, Color3.fromRGB(210,120,255), 1, 0.6)
 
+-- Multi-layer gradient effect
 local pagesGrad = Instance.new("UIGradient")
-pagesGrad.Rotation = 45
+pagesGrad.Rotation = 135
 pagesGrad.Color = ColorSequence.new{
-	ColorSequenceKeypoint.new(0.00, Color3.fromRGB(55,26,75)),
-	ColorSequenceKeypoint.new(0.60, Color3.fromRGB(43,18,56)),
-	ColorSequenceKeypoint.new(1.00, Color3.fromRGB(35,14,47)),
+	ColorSequenceKeypoint.new(0.00, Color3.fromRGB(60,28,80)),
+	ColorSequenceKeypoint.new(0.30, Color3.fromRGB(48,20,62)),
+	ColorSequenceKeypoint.new(0.70, Color3.fromRGB(38,16,50)),
+	ColorSequenceKeypoint.new(1.00, Color3.fromRGB(28,10,38)),
 }
 pagesGrad.Parent = pages
+
+-- Add subtle animated overlay
+local pagesOverlay = Instance.new("Frame")
+pagesOverlay.Name = "AnimatedOverlay"
+pagesOverlay.BackgroundTransparency = 0.85
+pagesOverlay.BorderSizePixel = 0
+pagesOverlay.Size = UDim2.fromScale(1, 1)
+pagesOverlay.ZIndex = 1
+pagesOverlay.Parent = pages
+
+local overlayGrad = Instance.new("UIGradient")
+overlayGrad.Color = ColorSequence.new{
+	ColorSequenceKeypoint.new(0.0, MAGENTA),
+	ColorSequenceKeypoint.new(0.5, CYAN),
+	ColorSequenceKeypoint.new(1.0, MAGENTA)
+}
+overlayGrad.Rotation = 0
+overlayGrad.Transparency = NumberSequence.new{
+	NumberSequenceKeypoint.new(0, 1),
+	NumberSequenceKeypoint.new(0.5, 0.85),
+	NumberSequenceKeypoint.new(1, 1)
+}
+overlayGrad.Parent = pagesOverlay
+
+-- Animate overlay gradient
+task.spawn(function()
+	while pages.Parent do
+		tween(overlayGrad, TweenInfo.new(4, Enum.EasingStyle.Sine, Enum.EasingDirection.InOut), {Rotation = 360})
+		task.wait(4)
+		overlayGrad.Rotation = 0
+	end
+end)
+
+-- Ambient floating particles
+local particlesContainer = Instance.new("Frame")
+particlesContainer.Name = "Particles"
+particlesContainer.BackgroundTransparency = 1
+particlesContainer.BorderSizePixel = 0
+particlesContainer.Size = UDim2.fromScale(1, 1)
+particlesContainer.ZIndex = 1
+particlesContainer.Parent = pages
+
+-- Spawn ambient particles
+task.spawn(function()
+	local particles = {}
+	for i = 1, 15 do
+		local p = Instance.new("Frame")
+		p.AnchorPoint = Vector2.new(0.5, 0.5)
+		p.Position = UDim2.fromScale(math.random(), math.random())
+		p.Size = UDim2.fromOffset(3, 3)
+		p.BackgroundColor3 = math.random() > 0.5 and CYAN or MAGENTA
+		p.BackgroundTransparency = 0.6
+		p.BorderSizePixel = 0
+		p.ZIndex = 2
+		p.Parent = particlesContainer
+		corner(p, 3)
+		
+		table.insert(particles, {
+			frame = p,
+			speedX = (math.random() - 0.5) * 0.15,
+			speedY = (math.random() - 0.5) * 0.15,
+			phase = math.random() * math.pi * 2
+		})
+	end
+	
+	-- Animate particles
+	local time = 0
+	RunService.RenderStepped:Connect(function(dt)
+		if not pages.Parent then return end
+		time = time + dt
+		for _, particle in ipairs(particles) do
+			local p = particle.frame
+			local pos = p.Position
+			local newX = pos.X.Scale + particle.speedX * dt
+			local newY = pos.Y.Scale + particle.speedY * dt
+			
+			-- Wrap around edges
+			if newX > 1.1 then newX = -0.1 elseif newX < -0.1 then newX = 1.1 end
+			if newY > 1.1 then newY = -0.1 elseif newY < -0.1 then newY = 1.1 end
+			
+			p.Position = UDim2.fromScale(newX, newY)
+			
+			-- Pulsing transparency
+			p.BackgroundTransparency = 0.4 + math.sin(time * 2 + particle.phase) * 0.3
+		end
+	end)
+end)
 
 -- Empty pages for tabs
 local function makePage(name)
@@ -425,148 +666,142 @@ local function makeItemButton(text)
 	return b
 end
 -- [Items logic] live scan of Models, search, and teleport
+do
+	local itemsState = {
+		modelButton = {},   -- [Model] = TextButton
+		nameChanged = {},   -- [Model] = RBXScriptConnection
+		observingRoot = nil, -- current root folder we watch
+		rootConnections = {} -- to disconnect when root changes
+	}
 
--- Root getter (resolves path each time in case the hierarchy reloads)
-local function getLootRoot()
-	local env = workspace:FindFirstChild("Environment")
-	if not env then return nil end
-	local wms = env:FindFirstChild("WorldModelSpawns")
-	if not wms then return nil end
-	local loot = wms:FindFirstChild("LootSpawnPoints")
-	return loot
-end
-
--- Storage
-local modelButton = {}   -- [Model] = TextButton
-local nameChanged = {}   -- [Model] = RBXScriptConnection
-local observingRoot -- current root folder we watch
-local rootConnections = {} -- to disconnect when root changes
-
--- Teleport helper
-local function teleportToModel(m)
-	if not m or not m:IsA("Model") then return end
-	local char = player.Character or player.CharacterAdded:Wait()
-	if not char then return end
-	-- Prefer Pivot; fall back to PrimaryPart or part in model
-	local pivotCFrame
-	local ok, cf = pcall(function() return m:GetPivot() end)
-	if ok then
-		pivotCFrame = cf
-	elseif m.PrimaryPart then
-		pivotCFrame = m.PrimaryPart.CFrame
-	else
-		local part = m:FindFirstChildWhichIsA("BasePart", true)
-		if part then pivotCFrame = part.CFrame end
+	-- Root getter (resolves path each time in case the hierarchy reloads)
+	local function getLootRoot()
+		local env = workspace:FindFirstChild("Environment")
+		if not env then return nil end
+		local wms = env:FindFirstChild("WorldModelSpawns")
+		if not wms then return nil end
+		local loot = wms:FindFirstChild("LootSpawnPoints")
+		return loot
 	end
-	if not pivotCFrame then return end
 
-	local offset = CFrame.new(0, 4, 0) -- small lift above pivot
-	-- Use Character:PivotTo for a clean teleport
-	char:PivotTo(pivotCFrame * offset)
-end
-
--- Create/remove buttons
-local function addModel(m)
-	if modelButton[m] then return end
-	local b = makeItemButton(m.Name)
-	b.Parent = itemsList
-	modelButton[m] = b
-
-	-- Click to TP
-	b.MouseButton1Click:Connect(function()
-		teleportToModel(m)
-	end)
-
-	-- Keep name in sync
-	nameChanged[m] = m:GetPropertyChangedSignal("Name"):Connect(function()
-		b.Name = m.Name
-		b.Text = m.Name
-	end)
-end
-
-local function removeModel(m)
-	local b = modelButton[m]
-	if b then b:Destroy() end
-	modelButton[m] = nil
-	if nameChanged[m] then nameChanged[m]:Disconnect() nameChanged[m] = nil end
-end
-
--- Populate once (scans all descendants; only Models)
-local function populateAll(root)
-	for m, _ in pairs(modelButton) do removeModel(m) end
-	if not root then return end
-	for _, inst in ipairs(root:GetDescendants()) do
-		if inst:IsA("Model") then addModel(inst) end
-	end
-end
-
--- Filter by search text (case-insensitive; hides/show buttons)
-local function applySearchFilter()
-	local query = string.lower(itemsSearch.Text)
-	for m, b in pairs(modelButton) do
-		if query == "" then
-			b.Visible = true
+	-- Teleport helper
+	local function teleportToModel(m)
+		if not m or not m:IsA("Model") then return end
+		local char = player.Character or player.CharacterAdded:Wait()
+		if not char then return end
+		-- Prefer Pivot; fall back to PrimaryPart or part in model
+		local pivotCFrame
+		local ok, cf = pcall(function() return m:GetPivot() end)
+		if ok then
+			pivotCFrame = cf
+		elseif m.PrimaryPart then
+			pivotCFrame = m.PrimaryPart.CFrame
 		else
-			b.Visible = string.find(string.lower(m.Name), query, 1, true) ~= nil
+			local part = m:FindFirstChildWhichIsA("BasePart", true)
+			if part then pivotCFrame = part.CFrame end
+		end
+		if not pivotCFrame then return end
+
+		local offset = CFrame.new(0, 4, 0) -- small lift above pivot
+		-- Use Character:PivotTo for a clean teleport
+		char:PivotTo(pivotCFrame * offset)
+	end
+
+	local function removeModel(m)
+		local b = itemsState.modelButton[m]
+		if b then b:Destroy() end
+		itemsState.modelButton[m] = nil
+		if itemsState.nameChanged[m] then itemsState.nameChanged[m]:Disconnect() itemsState.nameChanged[m] = nil end
+	end
+
+	local function addModel(m)
+		if itemsState.modelButton[m] then return end
+		local b = makeItemButton(m.Name)
+		b.Parent = itemsList
+		itemsState.modelButton[m] = b
+
+		-- Click to TP
+		b.MouseButton1Click:Connect(function()
+			teleportToModel(m)
+		end)
+
+		-- Keep name in sync
+		itemsState.nameChanged[m] = m:GetPropertyChangedSignal("Name"):Connect(function()
+			b.Name = m.Name
+			b.Text = m.Name
+		end)
+	end
+
+	-- Filter by search text (case-insensitive; hides/show buttons)
+	local function applySearchFilter()
+		local query = string.lower(itemsSearch.Text)
+		for m, b in pairs(itemsState.modelButton) do
+			if query == "" then
+				b.Visible = true
+			else
+				b.Visible = string.find(string.lower(m.Name), query, 1, true) ~= nil
+			end
 		end
 	end
-end
-itemsSearch:GetPropertyChangedSignal("Text"):Connect(applySearchFilter)
+	itemsSearch:GetPropertyChangedSignal("Text"):Connect(applySearchFilter)
 
--- Attach watchers to the current root so lists auto-update
-local function disconnectRootWatchers()
-	for _, c in ipairs(rootConnections) do
-		if c then c:Disconnect() end
+	local function disconnectRootWatchers()
+		for _, c in ipairs(itemsState.rootConnections) do
+			if c then c:Disconnect() end
+		end
+		itemsState.rootConnections = {}
+		itemsState.observingRoot = nil
 	end
-	rootConnections = {}
-	observingRoot = nil
-end
 
-local function attachRootWatchers(root)
-	disconnectRootWatchers()
-	if not root then return end
-	observingRoot = root
-
-	-- Build initial list
-	populateAll(root)
-	applySearchFilter()
-
-	-- Watch for new/removed models under the root
-	table.insert(rootConnections, root.DescendantAdded:Connect(function(inst)
-		if inst:IsA("Model") then
-			addModel(inst)
-			applySearchFilter()
+	local function populateAll(root)
+		for m, _ in pairs(itemsState.modelButton) do removeModel(m) end
+		if not root then return end
+		for _, inst in ipairs(root:GetDescendants()) do
+			if inst:IsA("Model") then addModel(inst) end
 		end
-	end))
-	table.insert(rootConnections, root.DescendantRemoving:Connect(function(inst)
-		if inst:IsA("Model") then
-			removeModel(inst)
-		end
-	end))
-
-	-- If the root itself moves or gets replaced, we'll retry binding
-	table.insert(rootConnections, root.AncestryChanged:Connect(function(_, parent)
-		if not parent then
-			-- lost root
-			task.defer(function()
-				disconnectRootWatchers()
-			end)
-		end
-	end))
-end
-
--- Poll the path periodically and re-bind if the root changes (covers reloads)
-task.spawn(function()
-	local last
-	while pageItems.Parent do
-		local root = getLootRoot()
-		if root ~= last then
-			attachRootWatchers(root)
-			last = root
-		end
-		task.wait(1.0) -- light polling; keeps tabs updated with spawners that re-create the tree
 	end
-end)
+
+	local function attachRootWatchers(root)
+		disconnectRootWatchers()
+		if not root then return end
+		itemsState.observingRoot = root
+
+		populateAll(root)
+		applySearchFilter()
+
+		table.insert(itemsState.rootConnections, root.DescendantAdded:Connect(function(inst)
+			if inst:IsA("Model") then
+				addModel(inst)
+				applySearchFilter()
+			end
+		end))
+		table.insert(itemsState.rootConnections, root.DescendantRemoving:Connect(function(inst)
+			if inst:IsA("Model") then
+				removeModel(inst)
+			end
+		end))
+
+		table.insert(itemsState.rootConnections, root.AncestryChanged:Connect(function(_, parent)
+			if not parent then
+				task.defer(function()
+					disconnectRootWatchers()
+				end)
+			end
+		end))
+	end
+
+	task.spawn(function()
+		local last
+		while pageItems.Parent do
+			local root = getLootRoot()
+			if root ~= last then
+				attachRootWatchers(root)
+				last = root
+			end
+			task.wait(1.0)
+		end
+	end)
+end
 local pageAmmo  = makePage("AmmoPage")
 
 -- [Ammo UI] put right after: local pageAmmo = makePage("AmmoPage")
@@ -613,113 +848,107 @@ local function makeAmmoButton(text)
 end
 
 -- [Ammo logic] MeshPart scan + live updates + teleport on click
+do
+	local ammoState = {
+		meshButton = {},
+		nameConn = {},
+		rootConns = {},
+		observedRoot = nil
+	}
 
--- Resolve the ammo root each time (handles reloads)
-local function getAmmoRoot()
-	local env = workspace:FindFirstChild("Environment")
-	if not env then return nil end
-	local inter = env:FindFirstChild("Interactable")
-	if not inter then return nil end
-	local ammo = inter:FindFirstChild("Ammo")
-	return ammo
-end
+	local function getAmmoRoot()
+		local env = workspace:FindFirstChild("Environment")
+		if not env then return nil end
+		local inter = env:FindFirstChild("Interactable")
+		if not inter then return nil end
+		return inter:FindFirstChild("Ammo")
+	end
 
--- Teleport helper for MeshPart
-local function teleportToPart(part: MeshPart)
-	if not part or not part:IsA("BasePart") then return end
-	local char = player.Character or player.CharacterAdded:Wait()
-	if not char then return end
-	-- Stand slightly above the part
-	char:PivotTo(part.CFrame * CFrame.new(0, 4, 0))
-end
+	local function teleportToPart(part: MeshPart)
+		if not part or not part:IsA("BasePart") then return end
+		local char = player.Character or player.CharacterAdded:Wait()
+		if not char then return end
+		char:PivotTo(part.CFrame * CFrame.new(0, 4, 0))
+	end
 
--- Storage and cleanup (typed)
-local meshButton: { [Instance]: TextButton } = {}
-local nameConn:   { [Instance]: RBXScriptConnection } = {}
-local rootConns:  { RBXScriptConnection } = {}
-local observedRoot: Instance? = nil
+	local function removeMesh(part: MeshPart)
+		local b = ammoState.meshButton[part]
+		if b then b:Destroy() end
+		ammoState.meshButton[part] = nil
+		if ammoState.nameConn[part] then ammoState.nameConn[part]:Disconnect() ammoState.nameConn[part] = nil end
+	end
 
-local function addMesh(part: MeshPart)
-	if meshButton[part] then return end
-	local b = makeAmmoButton(part.Name)
-	b.Parent = ammoList
-	meshButton[part] = b
+	local function addMesh(part: MeshPart)
+		if ammoState.meshButton[part] then return end
+		local b = makeAmmoButton(part.Name)
+		b.Parent = ammoList
+		ammoState.meshButton[part] = b
 
-	-- Click to TP
-	b.MouseButton1Click:Connect(function()
-		teleportToPart(part)
-	end)
+		b.MouseButton1Click:Connect(function()
+			teleportToPart(part)
+		end)
 
-	-- Keep label synced with part.Name
-	nameConn[part] = part:GetPropertyChangedSignal("Name"):Connect(function()
-		b.Name = part.Name
-		b.Text = part.Name
-	end)
-end
+		ammoState.nameConn[part] = part:GetPropertyChangedSignal("Name"):Connect(function()
+			b.Name = part.Name
+			b.Text = part.Name
+		end)
+	end
 
-local function removeMesh(part: MeshPart)
-	local b = meshButton[part]
-	if b then b:Destroy() end
-	meshButton[part] = nil
-	if nameConn[part] then nameConn[part]:Disconnect() nameConn[part] = nil end
-end
+	local function clearAll()
+		for inst,_ in pairs(ammoState.meshButton) do removeMesh(inst) end
+	end
 
-local function clearAll()
-	for inst,_ in pairs(meshButton) do removeMesh(inst) end
-end
-
--- Initial/refresh population
-local function populateAll(root: Instance?)
-	clearAll()
-	if not root then return end
-	for _, inst in ipairs(root:GetDescendants()) do
-		if inst:IsA("MeshPart") then
-			addMesh(inst)
+	local function populateAll(root: Instance?)
+		clearAll()
+		if not root then return end
+		for _, inst in ipairs(root:GetDescendants()) do
+			if inst:IsA("MeshPart") then
+				addMesh(inst)
+			end
 		end
 	end
-end
 
--- Manage watchers on the ammo root so list auto-updates
-local function disconnectRootWatchers()
-	for _, c in ipairs(rootConns) do
-		if c then c:Disconnect() end
-	end
-	rootConns = {}
-	observedRoot = nil
-end
-
-local function attachRootWatchers(root: Instance?)
-	disconnectRootWatchers()
-	if not root then return end
-	observedRoot = root
-
-	populateAll(root)
-
-	table.insert(rootConns, root.DescendantAdded:Connect(function(inst)
-		if inst:IsA("MeshPart") then addMesh(inst) end
-	end))
-	table.insert(rootConns, root.DescendantRemoving:Connect(function(inst)
-		if inst:IsA("MeshPart") then removeMesh(inst) end
-	end))
-	table.insert(rootConns, root.AncestryChanged:Connect(function(_, parent)
-		if not parent then disconnectRootWatchers() end
-	end))
-end
-
--- Rebind to the path if it gets recreated (keeps the tab always updating)
-task.spawn(function()
-	local last
-	while pageAmmo.Parent do
-		local root = getAmmoRoot()
-		if root ~= last then
-			attachRootWatchers(root)
-			last = root
+	local function disconnectRootWatchers()
+		for _, c in ipairs(ammoState.rootConns) do
+			if c then c:Disconnect() end
 		end
-		task.wait(1.0)
+		ammoState.rootConns = {}
+		ammoState.observedRoot = nil
 	end
-end)
+
+	local function attachRootWatchers(root: Instance?)
+		disconnectRootWatchers()
+		if not root then return end
+		ammoState.observedRoot = root
+
+		populateAll(root)
+
+		table.insert(ammoState.rootConns, root.DescendantAdded:Connect(function(inst)
+			if inst:IsA("MeshPart") then addMesh(inst) end
+		end))
+		table.insert(ammoState.rootConns, root.DescendantRemoving:Connect(function(inst)
+			if inst:IsA("MeshPart") then removeMesh(inst) end
+		end))
+		table.insert(ammoState.rootConns, root.AncestryChanged:Connect(function(_, parent)
+			if not parent then disconnectRootWatchers() end
+		end))
+	end
+
+	task.spawn(function()
+		local last
+		while pageAmmo.Parent do
+			local root = getAmmoRoot()
+			if root ~= last then
+				attachRootWatchers(root)
+				last = root
+			end
+			task.wait(1.0)
+		end
+	end)
+end
 
 local pageMisc  = makePage("MiscPage")
+local pageMods  = makePage("ModsPage")
 
 -- [Misc UI] Toggle row
 local miscContainer = Instance.new("ScrollingFrame")
@@ -744,6 +973,30 @@ miscPad.PaddingBottom = UDim.new(0, 8)
 local miscLayout = Instance.new("UIListLayout", miscContainer)
 miscLayout.SortOrder = Enum.SortOrder.LayoutOrder
 miscLayout.Padding = UDim.new(0, 10)
+
+-- [Mods UI] Toggle container
+local modsContainer = Instance.new("ScrollingFrame")
+modsContainer.Name = "ModsContainer"
+modsContainer.BackgroundTransparency = 1
+modsContainer.BorderSizePixel = 0
+modsContainer.Size = UDim2.new(1, -16, 1, -16)
+modsContainer.Position = UDim2.new(0, 8, 0, 8)
+modsContainer.ScrollingDirection = Enum.ScrollingDirection.Y
+modsContainer.AutomaticCanvasSize = Enum.AutomaticSize.Y
+modsContainer.ScrollBarThickness = 8
+modsContainer.ScrollBarImageColor3 = Color3.fromRGB(170, 82, 205)
+modsContainer.CanvasSize = UDim2.new(0, 0, 0, 0)
+modsContainer.Parent = pageMods
+
+local modsPad = Instance.new("UIPadding", modsContainer)
+modsPad.PaddingTop = UDim.new(0, 8)
+modsPad.PaddingLeft = UDim.new(0, 8)
+modsPad.PaddingRight = UDim.new(0, 8)
+modsPad.PaddingBottom = UDim.new(0, 8)
+
+local modsLayout = Instance.new("UIListLayout", modsContainer)
+modsLayout.SortOrder = Enum.SortOrder.LayoutOrder
+modsLayout.Padding = UDim.new(0, 10)
 
 -- Group UI elements to reduce local variable count
 local ui = {
@@ -802,11 +1055,13 @@ ui.corners.staminaKnob.CornerRadius = UDim.new(1, 0)
 local row, label, switch, knob = ui.rows.stamina, ui.labels.stamina, ui.switches.stamina, ui.knobs.stamina
 
 -- Helper function to create toggle rows
-local function createToggleRow(name, text, switchName)
+local function createToggleRow(name, text, switchName, parentContainer)
+	parentContainer = parentContainer or miscContainer -- default to miscContainer
+	
 	ui.rows[name] = Instance.new("Frame")
 	ui.rows[name].BackgroundTransparency = 1
 	ui.rows[name].Size = UDim2.new(1, 0, 0, 36)
-	ui.rows[name].Parent = miscContainer
+	ui.rows[name].Parent = parentContainer
 
 	ui.labels[name] = Instance.new("TextLabel")
 	ui.labels[name].BackgroundTransparency = 1
@@ -846,15 +1101,20 @@ local function createToggleRow(name, text, switchName)
 	ui.corners[name .. "Knob"].CornerRadius = UDim.new(1, 0)
 end
 
--- Create all toggle rows
+-- Create Misc toggle rows
 createToggleRow("ragdoll", "No ragdoll (No Fall)", "NoRagdollSwitch")
 createToggleRow("paralyze", "Paralyze all bots", "ParalyzeBotsSwitch")
-createToggleRow("recoil", "No recoil", "NoRecoilSwitch")
-createToggleRow("silent", "Silent gun", "SilentGunSwitch")
-createToggleRow("fast", "Fast bullet", "FastBulletSwitch")
-createToggleRow("equip", "No equip CD", "NoEquipCDSwitch")
-createToggleRow("auto", "Full auto", "FullAutoSwitch")
-createToggleRow("fireRate", "Fast fire rate", "FastFireRateSwitch")
+
+-- Create Mods toggle rows (pass modsContainer as 4th parameter)
+createToggleRow("recoil", "No recoil", "NoRecoilSwitch", modsContainer)
+createToggleRow("silent", "Silent gun", "SilentGunSwitch", modsContainer)
+createToggleRow("fast", "Fast bullet", "FastBulletSwitch", modsContainer)
+createToggleRow("equip", "No equip CD", "NoEquipCDSwitch", modsContainer)
+createToggleRow("auto", "Full auto", "FullAutoSwitch", modsContainer)
+createToggleRow("fireRate", "Fast fire rate", "FastFireRateSwitch", modsContainer)
+createToggleRow("range", "Bullet range", "BulletRangeSwitch", modsContainer)
+createToggleRow("spread", "No spread", "NoSpreadSwitch", modsContainer)
+
 
 -- Create aliases for backward compatibility
 local rowRag, ragLabel, ragSwitch, ragKnob = ui.rows.ragdoll, ui.labels.ragdoll, ui.switches.ragdoll, ui.knobs.ragdoll
@@ -865,6 +1125,8 @@ local fastRow, fastLabel, fastSwitch, fastKnob = ui.rows.fast, ui.labels.fast, u
 local equipRow, equipLabel, equipSwitch, equipKnob = ui.rows.equip, ui.labels.equip, ui.switches.equip, ui.knobs.equip
 local autoRow, autoLabel, autoSwitch, autoKnob = ui.rows.auto, ui.labels.auto, ui.switches.auto, ui.knobs.auto
 local fireRateRow, fireRateLabel, fireRateSwitch, fireRateKnob = ui.rows.fireRate, ui.labels.fireRate, ui.switches.fireRate, ui.knobs.fireRate
+local rangeRow, rangeLabel, rangeSwitch, rangeKnob = ui.rows.range, ui.labels.range, ui.switches.range, ui.knobs.range
+local spreadRow, spreadLabel, spreadSwitch, spreadKnob = ui.rows.spread, ui.labels.spread, ui.switches.spread, ui.knobs.spread
 
 -- [Misc UI] Kill all bots button
 local killBotsBtn = Instance.new("TextButton")
@@ -1066,6 +1328,17 @@ local charAddedConn: RBXScriptConnection?
 local currentHum: Humanoid?
 local hadRagdollTagThisChar = false
 
+local ragHbConn: RBXScriptConnection? = nil
+
+local function getStatStateAspect()
+	local char = player.Character or player.CharacterAdded:Wait()
+	local config = char:FindFirstChildWhichIsA("Configuration")
+	if not config then return end
+	local aspects = config:FindFirstChild("ReplicatedAspects")
+	if not aspects then return end
+	return aspects:FindFirstChild("StatState")
+end
+
 local function startNoRagdollFor(char, hum)
 	currentHum = hum
 	if not (char and hum) then return end
@@ -1107,6 +1380,17 @@ local function startNoRagdollFor(char, hum)
 			if inst:IsA("Constraint") then inst.Enabled = false end
 		end)
 	end
+
+	if ragHbConn then ragHbConn:Disconnect() end
+	ragHbConn = RunService.Heartbeat:Connect(function()
+		local statState = getStatStateAspect()
+		if not statState then return end
+		-- Ensure the game's tracking attributes related to falling and ragdoll are constantly false
+		-- This reliably bypasses fall damage calculation on landing.
+		statState:SetAttribute("IsFalling", false)
+		statState:SetAttribute("IsRagdolled", false)
+		statState:SetAttribute("ForcedRagdoll", false)
+	end)
 end
 
 local function stopNoRagdoll()
@@ -1114,6 +1398,16 @@ local function stopNoRagdoll()
 	if humStateConn then humStateConn:Disconnect() humStateConn = nil end
 	if rcChildConn  then rcChildConn:Disconnect()  rcChildConn  = nil end
 	if tagAddedConn then tagAddedConn:Disconnect() tagAddedConn = nil end
+
+	if ragHbConn then ragHbConn:Disconnect() ragHbConn = nil end
+
+	-- Ensure aspects revert to a neutral state just in case (setting to false is the neutral state)
+	local statState = getStatStateAspect()
+	if statState then
+		statState:SetAttribute("IsFalling", false)
+		statState:SetAttribute("IsRagdolled", false)
+		statState:SetAttribute("ForcedRagdoll", false)
+	end
 
 	local hum = currentHum
 	currentHum = nil
@@ -1557,7 +1851,7 @@ do
 		local ok, data = pcall(function() return require(mod) end)
 		if not ok or type(data) ~= "table" then return end
 		pcall(function()
-			data.ProjectileSpeed = 99999
+			data.ProjectileSpeed = 10000
 		end)
 	end
 
@@ -1774,7 +2068,7 @@ do
 	end)
 end
 
--- [Misc logic] Fast fire rate toggle
+-- [Misc logic] Fast fire rate toggle (Firearms + Melee)
 do
 	local ReplicatedStorage = game:GetService("ReplicatedStorage")
 	
@@ -1864,9 +2158,196 @@ do
 	end)
 end
 
-local pageShop  = makePage("ShopPage")
 
--- Pages (add two more)
+-- [Misc logic] Bullet range toggle
+do
+	local ReplicatedStorage = game:GetService("ReplicatedStorage")
+	
+	local function setRangeSwitchVisual(isOn)
+		if isOn then
+			rangeSwitch.BackgroundColor3 = Color3.fromRGB(90, 220, 255)
+			rangeKnob:TweenPosition(UDim2.new(1, -27, 0.5, 0), Enum.EasingDirection.Out, Enum.EasingStyle.Quad, 0.15, true)
+			rangeKnob.BackgroundColor3 = Color3.fromRGB(255, 105, 230)
+		else
+			rangeSwitch.BackgroundColor3 = Color3.fromRGB(66, 47, 88)
+			rangeKnob:TweenPosition(UDim2.new(0, 3, 0.5, 0), Enum.EasingDirection.Out, Enum.EasingStyle.Quad, 0.15, true)
+			rangeKnob.BackgroundColor3 = Color3.fromRGB(145, 59, 167)
+		end
+	end
+
+	local ATTR_RANGE = "PT_BulletRange"
+	local rangeEnabled = player:GetAttribute(ATTR_RANGE) == true
+	local originals = {}
+
+	local function getWeaponModules()
+		local assets = ReplicatedStorage:FindFirstChild("Assets")
+		if not assets then return {} end
+		local shared = assets:FindFirstChild("SharedData")
+		if not shared then return {} end
+		local settings = shared:FindFirstChild("WeaponSettings")
+		if not settings then return {} end
+		local firearms = settings:FindFirstChild("Firearms")
+		if not firearms then return {} end
+		
+		local mods = {}
+		for _, cat in ipairs(firearms:GetDescendants()) do
+			if cat:IsA("ModuleScript") then
+				table.insert(mods, cat)
+			end
+		end
+		return mods
+	end
+
+	local function captureOriginal(mod)
+		if originals[mod] then return end
+		local ok, data = pcall(function() return require(mod) end)
+		if not ok or type(data) ~= "table" then return end
+		originals[mod] = {
+			ProjectileMaxDist = data.ProjectileMaxDist,
+		}
+	end
+
+	local function applyRange(mod)
+		captureOriginal(mod)
+		local ok, data = pcall(function() return require(mod) end)
+		if not ok or type(data) ~= "table" then return end
+		pcall(function()
+			data.ProjectileMaxDist = 99999
+		end)
+	end
+
+	local function restoreRange(mod)
+		local snap = originals[mod]
+		if not snap then return end
+		local ok, data = pcall(function() return require(mod) end)
+		if not ok or type(data) ~= "table" then return end
+		pcall(function()
+			if snap.ProjectileMaxDist ~= nil then data.ProjectileMaxDist = snap.ProjectileMaxDist end
+		end)
+	end
+
+	local function applyToAll()
+		for _, mod in ipairs(getWeaponModules()) do
+			if rangeEnabled then
+				applyRange(mod)
+			else
+				restoreRange(mod)
+			end
+		end
+	end
+
+	local function setRangeEnabled(on)
+		rangeEnabled = on
+		player:SetAttribute(ATTR_RANGE, on)
+		setRangeSwitchVisual(on)
+		applyToAll()
+	end
+
+	setRangeEnabled(rangeEnabled or false)
+	rangeSwitch.MouseButton1Click:Connect(function()
+		setRangeEnabled(not rangeEnabled)
+	end)
+end
+
+-- [Misc logic] No spread toggle
+do
+	local ReplicatedStorage = game:GetService("ReplicatedStorage")
+	
+	local function setSpreadSwitchVisual(isOn)
+		if isOn then
+			spreadSwitch.BackgroundColor3 = Color3.fromRGB(90, 220, 255)
+			spreadKnob:TweenPosition(UDim2.new(1, -27, 0.5, 0), Enum.EasingDirection.Out, Enum.EasingStyle.Quad, 0.15, true)
+			spreadKnob.BackgroundColor3 = Color3.fromRGB(255, 105, 230)
+		else
+			spreadSwitch.BackgroundColor3 = Color3.fromRGB(66, 47, 88)
+			spreadKnob:TweenPosition(UDim2.new(0, 3, 0.5, 0), Enum.EasingDirection.Out, Enum.EasingStyle.Quad, 0.15, true)
+			spreadKnob.BackgroundColor3 = Color3.fromRGB(145, 59, 167)
+		end
+	end
+
+	local ATTR_NO_SPREAD = "PT_NoSpread"
+	local noSpreadEnabled = player:GetAttribute(ATTR_NO_SPREAD) == true
+	local originals = {}
+
+	local function getWeaponModules()
+		local assets = ReplicatedStorage:FindFirstChild("Assets")
+		if not assets then return {} end
+		local shared = assets:FindFirstChild("SharedData")
+		if not shared then return {} end
+		local settings = shared:FindFirstChild("WeaponSettings")
+		if not settings then return {} end
+		local firearms = settings:FindFirstChild("Firearms")
+		if not firearms then return {} end
+		
+		local mods = {}
+		for _, cat in ipairs(firearms:GetDescendants()) do
+			if cat:IsA("ModuleScript") then
+				table.insert(mods, cat)
+			end
+		end
+		return mods
+	end
+
+	local function captureOriginal(mod)
+		if originals[mod] then return end
+		local ok, data = pcall(function() return require(mod) end)
+		if not ok or type(data) ~= "table" then return end
+		originals[mod] = {
+			MinSpreadAngle = data.MinSpreadAngle,
+			MaxSpreadAngle = data.MaxSpreadAngle,
+			ProjectileGravity = data.ProjectileGravity,
+		}
+	end
+
+	local function applyNoSpread(mod)
+		captureOriginal(mod)
+		local ok, data = pcall(function() return require(mod) end)
+		if not ok or type(data) ~= "table" then return end
+		pcall(function()
+			data.MinSpreadAngle = 0
+			data.MaxSpreadAngle = 0
+			data.ProjectileGravity = Vector3.new(0, 0, 0)
+		end)
+	end
+
+	local function restoreSpread(mod)
+		local snap = originals[mod]
+		if not snap then return end
+		local ok, data = pcall(function() return require(mod) end)
+		if not ok or type(data) ~= "table" then return end
+		pcall(function()
+			if snap.MinSpreadAngle ~= nil then data.MinSpreadAngle = snap.MinSpreadAngle end
+			if snap.MaxSpreadAngle ~= nil then data.MaxSpreadAngle = snap.MaxSpreadAngle end
+			if snap.ProjectileGravity ~= nil then data.ProjectileGravity = snap.ProjectileGravity end
+		end)
+	end
+
+	local function applyToAll()
+		for _, mod in ipairs(getWeaponModules()) do
+			if noSpreadEnabled then
+				applyNoSpread(mod)
+			else
+				restoreSpread(mod)
+			end
+		end
+	end
+
+	local function setNoSpreadEnabled(on)
+		noSpreadEnabled = on
+		player:SetAttribute(ATTR_NO_SPREAD, on)
+		setSpreadSwitchVisual(on)
+		applyToAll()
+	end
+
+	setNoSpreadEnabled(noSpreadEnabled or false)
+	spreadSwitch.MouseButton1Click:Connect(function()
+		setNoSpreadEnabled(not noSpreadEnabled)
+	end)
+end
+
+-- (No reload feature removed)
+
+local pageShop  = makePage("ShopPage")
 local pageCrates = makePage("CratesPage")
 local pageTrash  = makePage("TrashPage")
 
@@ -1913,106 +2394,104 @@ end
 
 -- Encapsulated Trash logic
 local function setupTrashLogic()
-	local function getHazardsRoot()
-		local env = workspace:FindFirstChild("Environment")
-		if not env then return nil end
-		local inter = env:FindFirstChild("Interactable")
-		if not inter then return nil end
-		return inter:FindFirstChild("Hazards")
-	end
+    local state = {
+        buttons = {},
+        nameConn = {},
+        rootConns = {},
+        observedRoot = nil
+    }
 
-	local function tpToModelTrash(m)
-		if not m or not m:IsA("Model") then return end
-		local char = player.Character or player.CharacterAdded:Wait()
-		if not char then return end
-		local cf
-		local ok, pivot = pcall(function() return m:GetPivot() end)
-		if ok then cf = pivot
-		elseif m.PrimaryPart then cf = m.PrimaryPart.CFrame
-		else
-			local p = m:FindFirstChildWhichIsA("BasePart", true)
-			if p then cf = p.CFrame end
-		end
-		if not cf then return end
-		char:PivotTo(cf * CFrame.new(0, 4, 0))
-	end
+    local function getHazardsRoot()
+        local env = workspace:FindFirstChild("Environment")
+        if not env then return nil end
+        local inter = env:FindFirstChild("Interactable")
+        if not inter then return nil end
+        return inter:FindFirstChild("Hazards")
+    end
 
-	local trashButtons   = {}  -- [Model] = TextButton
-	local trashNameConn  = {}  -- [Model] = RBXScriptConnection
-	local hazardsConns   = {}  -- { RBXScriptConnection }
-	local observedHazards = nil
+    local function tpToModelTrash(m)
+        if not m or not m:IsA("Model") then return end
+        local char = player.Character or player.CharacterAdded:Wait()
+        if not char then return end
+        local cf
+        local ok, pivot = pcall(function() return m:GetPivot() end)
+        if ok then cf = pivot
+        elseif m.PrimaryPart then cf = m.PrimaryPart.CFrame
+        else
+            local p = m:FindFirstChildWhichIsA("BasePart", true)
+            if p then cf = p.CFrame end
+        end
+        if not cf then return end
+        char:PivotTo(cf * CFrame.new(0, 4, 0))
+    end
 
-	local function removeTrashModel(m)
-		local b = trashButtons[m]
-		if b then b:Destroy() end
-		trashButtons[m] = nil
-		if trashNameConn[m] then trashNameConn[m]:Disconnect() trashNameConn[m] = nil end
-	end
+    local function removeTrashModel(m)
+        local b = state.buttons[m]
+        if b then b:Destroy() end
+        state.buttons[m] = nil
+        if state.nameConn[m] then state.nameConn[m]:Disconnect() state.nameConn[m] = nil end
+    end
 
-	local function addTrashModel(m)
-		-- Only accept models explicitly named "Trash Can"
-		if not (m and m:IsA("Model") and m.Name == "Trash Can") then return end
-		if trashButtons[m] then return end
-		local b = makeTrashButton(m.Name)
-		b.Parent = trashList
-		trashButtons[m] = b
-		b.MouseButton1Click:Connect(function() tpToModelTrash(m) end)
-		trashNameConn[m] = m:GetPropertyChangedSignal("Name"):Connect(function()
-			if m.Name ~= "Trash Can" then
-				removeTrashModel(m)
-			else
-				local btn = trashButtons[m]
-				if btn then btn.Name = m.Name; btn.Text = m.Name end
-			end
-		end)
-	end
+    local function addTrashModel(m)
+        if not (m and m:IsA("Model") and m.Name == "Trash Can") then return end
+        if state.buttons[m] then return end
+        local b = makeTrashButton(m.Name)
+        b.Parent = trashList
+        state.buttons[m] = b
+        b.MouseButton1Click:Connect(function() tpToModelTrash(m) end)
+        state.nameConn[m] = m:GetPropertyChangedSignal("Name"):Connect(function()
+            if m.Name ~= "Trash Can" then
+                removeTrashModel(m)
+            else
+                local btn = state.buttons[m]
+                if btn then btn.Name = m.Name; btn.Text = m.Name end
+            end
+        end)
+    end
 
-	local function clearTrash()
-		for m,_ in pairs(trashButtons) do removeTrashModel(m) end
-	end
+    local function clearTrash()
+        for m,_ in pairs(state.buttons) do removeTrashModel(m) end
+    end
 
-	local function populateTrashDirect(root)
-		clearTrash()
-		if not root then return end
-		for _, child in ipairs(root:GetChildren()) do
-			addTrashModel(child)
-		end
-	end
+    local function populateTrashDirect(root)
+        clearTrash()
+        if not root then return end
+        for _, child in ipairs(root:GetChildren()) do
+            addTrashModel(child)
+        end
+    end
 
-	local function disconnectHazardsWatch()
-		for _, c in ipairs(hazardsConns) do if c then c:Disconnect() end end
-		hazardsConns = {}
-		observedHazards = nil
-	end
+    local function disconnectHazardsWatch()
+        for _, c in ipairs(state.rootConns) do if c then c:Disconnect() end end
+        state.rootConns = {}
+        state.observedRoot = nil
+    end
 
-	local function attachHazardsWatch(root)
-		disconnectHazardsWatch()
-		if not root then return end
-		observedHazards = root
-		populateTrashDirect(root)
-		table.insert(hazardsConns, root.ChildAdded:Connect(function(inst)
-			addTrashModel(inst)
-		end))
-		table.insert(hazardsConns, root.ChildRemoved:Connect(function(inst)
-			if trashButtons[inst] then removeTrashModel(inst) end
-		end))
-		table.insert(hazardsConns, root.AncestryChanged:Connect(function(_, parent)
-			if not parent then disconnectHazardsWatch() end
-		end))
-	end
+    local function attachHazardsWatch(root)
+        disconnectHazardsWatch()
+        if not root then return end
+        state.observedRoot = root
+        populateTrashDirect(root)
+        table.insert(state.rootConns, root.ChildAdded:Connect(addTrashModel))
+        table.insert(state.rootConns, root.ChildRemoved:Connect(function(inst)
+            if state.buttons[inst] then removeTrashModel(inst) end
+        end))
+        table.insert(state.rootConns, root.AncestryChanged:Connect(function(_, parent)
+            if not parent then disconnectHazardsWatch() end
+        end))
+    end
 
-	-- Rebind if Hazards is recreated; keeps list accurate
-	task.spawn(function()
-		local last
-		while pageTrash.Parent do
-			local root = getHazardsRoot()
-			if root ~= last then
-				attachHazardsWatch(root)
-				last = root
-			end
-			task.wait(1.0)
-		end
-	end)
+    task.spawn(function()
+        local last
+        while pageTrash.Parent do
+            local root = getHazardsRoot()
+            if root ~= last then
+                attachHazardsWatch(root)
+                last = root
+            end
+            task.wait(1.0)
+        end
+    end)
 end
 
 setupTrashLogic()
@@ -2060,94 +2539,89 @@ end
 
 -- Encapsulated Crates logic
 local function setupCratesLogic()
-	local function tpToModelCrate(m)
-	if not m or not m:IsA("Model") then return end
-	local char = player.Character or player.CharacterAdded:Wait()
-	if not char then return end
-	local cf
-	local ok, pivot = pcall(function() return m:GetPivot() end)
-	if ok then cf = pivot
-	elseif m.PrimaryPart then cf = m.PrimaryPart.CFrame
-	else
-		local p = m:FindFirstChildWhichIsA("BasePart", true)
-		if p then cf = p.CFrame end
-	end
-	if not cf then return end
-	char:PivotTo(cf * CFrame.new(0, 4, 0))
-end
+    local state = {
+        buttons = {},
+        nameConn = {},
+        rootConns = {}
+    }
 
-	local crateButtons = {}  -- [Model] = TextButton
-	local crateNameConn = {}  -- [Model] = RBXScriptConnection
-	local crateConns = {}  -- { RBXScriptConnection }
+    local function tpToModelCrate(m)
+        if not m or not m:IsA("Model") then return end
+        local char = player.Character or player.CharacterAdded:Wait()
+        if not char then return end
+        local cf
+        local ok, pivot = pcall(function() return m:GetPivot() end)
+        if ok then cf = pivot
+        elseif m.PrimaryPart then cf = m.PrimaryPart.CFrame
+        else
+            local p = m:FindFirstChildWhichIsA("BasePart", true)
+            if p then cf = p.CFrame end
+        end
+        if not cf then return end
+        char:PivotTo(cf * CFrame.new(0, 4, 0))
+    end
 
-	local function addCrate(m)
-	if crateButtons[m] then return end
-	if m.Name ~= "Military Crate" then return end
-	local b = makeCrateButton(m.Name)
-	b.Parent = cratesList
-	crateButtons[m] = b
-	b.MouseButton1Click:Connect(function() tpToModelCrate(m) end)
-	crateNameConn[m] = m:GetPropertyChangedSignal("Name"):Connect(function()
-		if m.Name ~= "Military Crate" then
-			local btn = crateButtons[m]; if btn then btn:Destroy() end
-			crateButtons[m] = nil
-			if crateNameConn[m] then crateNameConn[m]:Disconnect() crateNameConn[m] = nil end
-		else
-			local btn = crateButtons[m]; if btn then btn.Name = m.Name; btn.Text = m.Name end
-		end
-	end)
-end
+    local function removeCrate(m)
+        local b = state.buttons[m]
+        if b then b:Destroy() end
+        state.buttons[m] = nil
+        if state.nameConn[m] then state.nameConn[m]:Disconnect() state.nameConn[m] = nil end
+    end
 
-	local function removeCrate(m)
-	local b = crateButtons[m]
-	if b then b:Destroy() end
-	crateButtons[m] = nil
-	if crateNameConn[m] then crateNameConn[m]:Disconnect() crateNameConn[m] = nil end
-end
+    local function addCrate(m)
+        if not (m and m:IsA("Model") and m.Name == "Military Crate") then return end
+        if state.buttons[m] then return end
+        local b = makeCrateButton(m.Name)
+        b.Parent = cratesList
+        state.buttons[m] = b
+        b.MouseButton1Click:Connect(function() tpToModelCrate(m) end)
+        state.nameConn[m] = m:GetPropertyChangedSignal("Name"):Connect(function()
+            if m.Name ~= "Military Crate" then
+                removeCrate(m)
+            else
+                local btn = state.buttons[m]
+                if btn then btn.Name = m.Name; btn.Text = m.Name end
+            end
+        end)
+    end
 
-local function clearCrates()
-	for m,_ in pairs(crateButtons) do removeCrate(m) end
-end
+    local function clearCrates()
+        for m,_ in pairs(state.buttons) do removeCrate(m) end
+    end
 
-local function populateCratesAll()
-	clearCrates()
-	for _, inst in ipairs(workspace:GetDescendants()) do
-		if inst:IsA("Model") and inst.Name == "Military Crate" then
-			addCrate(inst)
-		end
-	end
-end
+    local function populateCratesAll()
+        clearCrates()
+        for _, inst in ipairs(workspace:GetDescendants()) do
+            addCrate(inst)
+        end
+    end
 
-local function disconnectCrateWatchers()
-	for _, c in ipairs(crateConns) do if c then c:Disconnect() end end
-	crateConns = {}
-end
+    local function disconnectCrateWatchers()
+        for _, c in ipairs(state.rootConns) do if c then c:Disconnect() end end
+        state.rootConns = {}
+    end
 
-local function attachCrateWatchers()
-	disconnectCrateWatchers()
-	populateCratesAll()
-	table.insert(crateConns, workspace.DescendantAdded:Connect(function(inst)
-		if inst:IsA("Model") and inst.Name == "Military Crate" then
-			addCrate(inst)
-		end
-	end))
-	table.insert(crateConns, workspace.DescendantRemoving:Connect(function(inst)
-		if crateButtons[inst] then removeCrate(inst) end
-	end))
-	-- Light poll to catch rare renames to "Military Crate"
-	task.spawn(function()
-		while pageCrates.Parent do
-			for _, inst in ipairs(workspace:GetDescendants()) do
-				if inst:IsA("Model") and inst.Name == "Military Crate" then
-					if not crateButtons[inst] then addCrate(inst) end
-				end
-			end
-			task.wait(2.0)
-		end
-	end)
-end
+    local function attachCrateWatchers()
+        disconnectCrateWatchers()
+        populateCratesAll()
+        table.insert(state.rootConns, workspace.DescendantAdded:Connect(addCrate))
+        table.insert(state.rootConns, workspace.DescendantRemoving:Connect(function(inst)
+            if state.buttons[inst] then removeCrate(inst) end
+        end))
+        -- Light poll for renames
+        task.spawn(function()
+            while pageCrates.Parent do
+                for _, inst in ipairs(workspace:GetDescendants()) do
+                    if inst:IsA("Model") and inst.Name == "Military Crate" and not state.buttons[inst] then
+                        addCrate(inst)
+                    end
+                end
+                task.wait(2.0)
+            end
+        end)
+    end
 
-attachCrateWatchers()
+    attachCrateWatchers()
 end
 
 setupCratesLogic()
@@ -2195,110 +2669,109 @@ end
 
 -- Encapsulated Shop logic
 local function setupShopLogic()
-local function getVendorsRoot()
-	local env = workspace:FindFirstChild("Environment")
-	if not env then return nil end
-	return env:FindFirstChild("Vendors")
-end
+        local state = {
+            buttons = {},
+            nameConn = {},
+            rootConns = {},
+            observedRoot = nil
+        }
 
-local function tpToModel(m)
-	if not m or not m:IsA("Model") then return end
-	local char = player.Character or player.CharacterAdded:Wait()
-	if not char then return end
-	local cf
-	local ok, pivot = pcall(function() return m:GetPivot() end)
-	if ok then
-		cf = pivot
-	elseif m.PrimaryPart then
-		cf = m.PrimaryPart.CFrame
-	else
-		local p = m:FindFirstChildWhichIsA("BasePart", true)
-		if p then cf = p.CFrame end
-	end
-	if not cf then return end
-	char:PivotTo(cf * CFrame.new(0, 4, 0))
-end
+        local function getVendorsRoot()
+            local env = workspace:FindFirstChild("Environment")
+            if not env then return nil end
+            return env:FindFirstChild("Vendors")
+        end
 
-local shopButtons = {}          -- [Model] = TextButton
-local shopNameConn = {}         -- [Model] = RBXScriptConnection
-local vendorsConns = {}         -- { RBXScriptConnection }
-local observedVendors = nil
+        local function tpToModel(m)
+            if not m or not m:IsA("Model") then return end
+            local char = player.Character or player.CharacterAdded:Wait()
+            if not char then return end
+            local cf
+            local ok, pivot = pcall(function() return m:GetPivot() end)
+            if ok then cf = pivot
+            elseif m.PrimaryPart then cf = m.PrimaryPart.CFrame
+            else
+                local p = m:FindFirstChildWhichIsA("BasePart", true)
+                if p then cf = p.CFrame end
+            end
+            if not cf then return end
+            char:PivotTo(cf * CFrame.new(0, 4, 0))
+        end
 
-local function addVendorModel(m)
-	if shopButtons[m] then return end
-	local b = makeShopButton(m.Name)
-	b.Parent = shopList
-	shopButtons[m] = b
-	b.MouseButton1Click:Connect(function() tpToModel(m) end)
-	shopNameConn[m] = m:GetPropertyChangedSignal("Name"):Connect(function()
-		b.Name = m.Name
-		b.Text = m.Name
-	end)
-end
+        local function removeVendorModel(m)
+            local b = state.buttons[m]
+            if b then b:Destroy() end
+            state.buttons[m] = nil
+            if state.nameConn[m] then state.nameConn[m]:Disconnect() state.nameConn[m] = nil end
+        end
 
-local function removeVendorModel(m)
-	local b = shopButtons[m]
-	if b then b:Destroy() end
-	shopButtons[m] = nil
-	if shopNameConn[m] then shopNameConn[m]:Disconnect() shopNameConn[m] = nil end
-end
+        local function addVendorModel(m)
+            if state.buttons[m] then return end
+            local b = makeShopButton(m.Name)
+            b.Parent = shopList
+            state.buttons[m] = b
+            b.MouseButton1Click:Connect(function() tpToModel(m) end)
+            state.nameConn[m] = m:GetPropertyChangedSignal("Name"):Connect(function()
+                b.Name = m.Name
+                b.Text = m.Name
+            end)
+        end
 
-local function clearVendors()
-	for m,_ in pairs(shopButtons) do removeVendorModel(m) end
-end
+        local function clearVendors()
+            for m,_ in pairs(state.buttons) do removeVendorModel(m) end
+        end
 
-local function populateVendors(root)
-	clearVendors()
-	if not root then return end
-	for _, child in ipairs(root:GetChildren()) do
-		if child:IsA("Model") then
-			addVendorModel(child)
-		end
-	end
-end
+        local function populateVendors(root)
+            clearVendors()
+            if not root then return end
+            for _, child in ipairs(root:GetChildren()) do
+                if child:IsA("Model") then
+                    addVendorModel(child)
+                end
+            end
+        end
 
-local function disconnectVendorsWatch()
-	for _, c in ipairs(vendorsConns) do if c then c:Disconnect() end end
-	vendorsConns = {}
-	observedVendors = nil
-end
+        local function disconnectVendorsWatch()
+            for _, c in ipairs(state.rootConns) do if c then c:Disconnect() end end
+            state.rootConns = {}
+            state.observedRoot = nil
+        end
 
-local function attachVendorsWatch(root)
-	disconnectVendorsWatch()
-	if not root then return end
-	observedVendors = root
-	populateVendors(root)
-	table.insert(vendorsConns, root.ChildAdded:Connect(function(inst)
-		if inst:IsA("Model") then addVendorModel(inst) end
-	end))
-	table.insert(vendorsConns, root.ChildRemoved:Connect(function(inst)
-		if shopButtons[inst] then removeVendorModel(inst) end
-	end))
-end
+        local function attachVendorsWatch(root)
+            disconnectVendorsWatch()
+            if not root then return end
+            state.observedRoot = root
+            populateVendors(root)
+            table.insert(state.rootConns, root.ChildAdded:Connect(function(inst)
+                if inst:IsA("Model") then addVendorModel(inst) end
+            end))
+            table.insert(state.rootConns, root.ChildRemoved:Connect(function(inst)
+                if state.buttons[inst] then removeVendorModel(inst) end
+            end))
+        end
 
-	-- Rebind if Vendors is recreated; keeps list accurate
-task.spawn(function()
-	local last
-	while pageShop.Parent do
-		local root = getVendorsRoot()
-		if root ~= last then
-			attachVendorsWatch(root)
-			last = root
-		end
-		task.wait(1.0)
-	end
-end)
-end
+        task.spawn(function()
+            local last
+            while pageShop.Parent do
+                local root = getVendorsRoot()
+                if root ~= last then
+                    attachVendorsWatch(root)
+                    last = root
+                end
+                task.wait(1.0)
+            end
+        end)
+    end
 
-setupShopLogic()
+    setupShopLogic()
 
--- Replace your existing tabList/pageList with these:
-local pageList  = {pageItems, pageAmmo, pageMisc, pageShop, pageCrates, pageTrash}
+    -- Replace your existing tabList/pageList with these:
+    pageList  = {pageItems, pageAmmo, pageMisc, pageShop, pageCrates, pageTrash, pageMods}
 
--- Initial selection
-local currentIndex = 1
-pageList[currentIndex].Visible = true
-pageList[currentIndex].Position = UDim2.new(0,0,0,0)
+    -- Initial selection
+    currentIndex = 1
+    pageList[currentIndex].Visible = true
+    pageList[currentIndex].Position = UDim2.new(0,0,0,0)
 
 -- Update tab visuals (color + underline)
 local function setTabVisual(activeIndex)
@@ -2319,12 +2792,58 @@ local function setTabVisual(activeIndex)
 end
 setTabVisual(currentIndex)
 
--- Directional swipe transition
+-- Directional swipe transition with particles
 local function slideTo(targetIndex)
 	if targetIndex == currentIndex then
 		setTabVisual(currentIndex)
 		return
 	end
+	
+	-- Spawn transition particles
+	task.spawn(function()
+		local particleContainer = Instance.new("Frame")
+		particleContainer.Name = "TransitionParticles"
+		particleContainer.BackgroundTransparency = 1
+		particleContainer.BorderSizePixel = 0
+		particleContainer.Size = UDim2.fromScale(1, 1)
+		particleContainer.ZIndex = 50
+		particleContainer.Parent = pages
+		
+		for i = 1, 12 do
+			local particle = Instance.new("Frame")
+			particle.AnchorPoint = Vector2.new(0.5, 0.5)
+			particle.Position = UDim2.fromScale(math.random(), math.random())
+			particle.Size = UDim2.fromOffset(8, 8)
+			particle.BackgroundColor3 = i % 2 == 0 and CYAN or MAGENTA
+			particle.BackgroundTransparency = 0.4
+			particle.BorderSizePixel = 0
+			particle.Parent = particleContainer
+			corner(particle, 8)
+			
+			-- Glow
+			local glow = Instance.new("Frame")
+			glow.AnchorPoint = Vector2.new(0.5, 0.5)
+			glow.Position = UDim2.fromScale(0.5, 0.5)
+			glow.Size = UDim2.fromOffset(16, 16)
+			glow.BackgroundColor3 = particle.BackgroundColor3
+			glow.BackgroundTransparency = 0.75
+			glow.BorderSizePixel = 0
+			glow.Parent = particle
+			corner(glow, 16)
+			
+			-- Random motion
+			local endX = math.random()
+			local endY = math.random()
+			tween(particle, TweenInfo.new(0.4, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), 
+				{Position = UDim2.fromScale(endX, endY), BackgroundTransparency = 1, Size = UDim2.fromOffset(0, 0)})
+			
+			task.wait(0.02)
+		end
+		
+		task.wait(0.5)
+		particleContainer:Destroy()
+	end)
+	
 	local oldPage = pageList[currentIndex]
 	local newPage = pageList[targetIndex]
 	local goingRight = targetIndex > currentIndex
@@ -2354,6 +2873,7 @@ tabShop.MouseButton1Click:Connect(function() slideTo(4) end)
 -- Click bindings
 tabCrates.MouseButton1Click:Connect(function() slideTo(5) end)
 tabTrash.MouseButton1Click:Connect(function()  slideTo(6) end)
+tabMods.MouseButton1Click:Connect(function()   slideTo(7) end)
 
 ----------------------------------------------------------------------
 -- Dragging (drag the title bar; clicking tabs won't drag)
@@ -2425,6 +2945,33 @@ function openWindow()
 	anim.fader.BackgroundTransparency = 0
 	win.Position = anim.homePos + UDim2.fromOffset(0, 8)
 
+	-- Spawn sparkles during open
+	task.spawn(function()
+		for i = 1, 25 do
+			local sparkle = Instance.new("Frame")
+			sparkle.AnchorPoint = Vector2.new(0.5, 0.5)
+			sparkle.Position = UDim2.fromScale(0.5, 0.5)
+			sparkle.Size = UDim2.fromOffset(4, 4)
+			sparkle.BackgroundColor3 = i % 2 == 0 and CYAN or MAGENTA
+			sparkle.BackgroundTransparency = 0.3
+			sparkle.BorderSizePixel = 0
+			sparkle.ZIndex = 1000
+			sparkle.Parent = win
+			corner(sparkle, 4)
+			
+			local angle = math.rad(i * (360/25))
+			local distance = math.random(100, 250)
+			local endX = 0.5 + math.cos(angle) * (distance / win.AbsoluteSize.X)
+			local endY = 0.5 + math.sin(angle) * (distance / win.AbsoluteSize.Y)
+			
+			local t1 = tween(sparkle, TweenInfo.new(0.6, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), 
+				{Position = UDim2.fromScale(endX, endY), BackgroundTransparency = 1, Size = UDim2.fromOffset(0, 0)})
+			t1.Completed:Connect(function() sparkle:Destroy() end)
+			
+			task.wait(0.02)
+		end
+	end)
+
 	tween(anim.fader, TweenInfo.new(0.28, Enum.EasingStyle.Sine, Enum.EasingDirection.Out), {BackgroundTransparency = 1})
 	tween(win,   TweenInfo.new(0.26, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {Position = anim.homePos})
 	local up = tween(anim.scale, TweenInfo.new(0.16, Enum.EasingStyle.Quint, Enum.EasingDirection.Out), {Scale = 1.03})
@@ -2437,6 +2984,43 @@ end
 function closeWindow()
 	if anim.animLock or not anim.isOpen or not anim.windowReady then return end
 	anim.animLock = true
+	
+	-- Spawn stars that implode to center
+	task.spawn(function()
+		for i = 1, 20 do
+			local star = Instance.new("Frame")
+			star.AnchorPoint = Vector2.new(0.5, 0.5)
+			local angle = math.rad(i * (360/20))
+			local startDist = 200
+			local startX = 0.5 + math.cos(angle) * (startDist / win.AbsoluteSize.X)
+			local startY = 0.5 + math.sin(angle) * (startDist / win.AbsoluteSize.Y)
+			star.Position = UDim2.fromScale(startX, startY)
+			star.Size = UDim2.fromOffset(6, 6)
+			star.BackgroundColor3 = i % 2 == 0 and MAGENTA or CYAN
+			star.BackgroundTransparency = 0.2
+			star.BorderSizePixel = 0
+			star.ZIndex = 1000
+			star.Parent = win
+			corner(star, 6)
+			
+			local glow = Instance.new("Frame")
+			glow.AnchorPoint = Vector2.new(0.5, 0.5)
+			glow.Position = UDim2.fromScale(0.5, 0.5)
+			glow.Size = UDim2.fromOffset(12, 12)
+			glow.BackgroundColor3 = star.BackgroundColor3
+			glow.BackgroundTransparency = 0.75
+			glow.BorderSizePixel = 0
+			glow.Parent = star
+			corner(glow, 12)
+			
+			local t1 = tween(star, TweenInfo.new(0.5, Enum.EasingStyle.Quad, Enum.EasingDirection.In), 
+				{Position = UDim2.fromScale(0.5, 0.5), BackgroundTransparency = 1, Size = UDim2.fromOffset(0, 0)})
+			t1.Completed:Connect(function() star:Destroy() end)
+			
+			task.wait(0.015)
+		end
+	end)
+	
 	tween(anim.fader, TweenInfo.new(0.20, Enum.EasingStyle.Sine, Enum.EasingDirection.In), {BackgroundTransparency = 0})
 	tween(win,   TweenInfo.new(0.24, Enum.EasingStyle.Quad, Enum.EasingDirection.In), {Position = anim.homePos + UDim2.fromOffset(0, 8)})
 	local down = tween(anim.scale, TweenInfo.new(0.24, Enum.EasingStyle.Quint, Enum.EasingDirection.In), {Scale = 0.94})
@@ -2477,144 +3061,143 @@ function safeSetCoreAll(enabled)
 	end
 end
 
+local IntroAnimation = {}
+do
+	function IntroAnimation.createOverlay(parent)
+		local overlay = Instance.new("Frame")
+		overlay.Name = "CinematicOverlay"
+		overlay.BackgroundColor3 = BG
+		overlay.Size = UDim2.fromScale(1, 1)
+		overlay.ZIndex = 100
+		overlay.ClipsDescendants = true
+		overlay.Parent = parent
+		return overlay
+	end
+
+	function IntroAnimation.createVignette(parent)
+		local vignette = Instance.new("Frame")
+		vignette.BackgroundTransparency = 1
+		vignette.Size = UDim2.fromScale(1, 1)
+		vignette.ZIndex = 102
+		vignette.Parent = parent
+		local vigGrad = Instance.new("UIGradient")
+		vigGrad.Color = ColorSequence.new{
+			ColorSequenceKeypoint.new(0.00, Color3.fromRGB(30, 12, 45)),
+			ColorSequenceKeypoint.new(0.60, Color3.fromRGB(30, 12, 45)),
+			ColorSequenceKeypoint.new(1.00, Color3.fromRGB(15, 5, 25))
+		}
+		vigGrad.Rotation = 90
+		vigGrad.Parent = vignette
+	end
+
+	function IntroAnimation.createParallaxStars(parent)
+		local starRoot = Instance.new("Frame")
+		starRoot.BackgroundTransparency = 1
+		starRoot.Size = UDim2.fromScale(1,1)
+		starRoot.ZIndex = 103
+		starRoot.Parent = parent
+
+		local layers = {
+			{count = 120, speed = 10,  size = Vector2.new(2,2), alpha = 0.45},
+			{count = 70,  speed = 25,  size = Vector2.new(3,3), alpha = 0.55},
+			{count = 28,  speed = 55,  size = Vector2.new(4,4), alpha = 0.70},
+		}
+		local movers = {}
+		local function makeStar(p, sz, a)
+			local s = Instance.new("Frame")
+			s.BackgroundColor3 = WHITE
+			s.BackgroundTransparency = 1 - a
+			s.Size = UDim2.fromOffset(sz.X, sz.Y)
+			s.Position = UDim2.fromScale(math.random(), math.random())
+			s.ZIndex = 103
+			s.Parent = p
+			local glow = Instance.new("Frame")
+			glow.AnchorPoint = Vector2.new(0.5, 0.5)
+			glow.Position = UDim2.fromScale(0.5, 0.5)
+			glow.Size = UDim2.fromOffset(sz.X*3, sz.Y*3)
+			glow.BackgroundColor3 = MAGENTA:Lerp(CYAN, math.random())
+			glow.BackgroundTransparency = 0.82
+			glow.Parent = s
+			corner(glow, math.max(sz.X, sz.Y))
+			corner(s, math.max(2, math.max(sz.X, sz.Y)))
+			return s
+		end
+		for _, l in ipairs(layers) do
+			for i=1, l.count do
+				local s = makeStar(starRoot, l.size, l.alpha)
+				table.insert(movers, {s = s, speed = l.speed})
+			end
+		end
+		return RunService.RenderStepped:Connect(function(dt)
+			for _, m in ipairs(movers) do
+				local p = m.s.Position
+				local x = p.X.Scale + (m.speed * dt)/100
+				local y = p.Y.Scale + (m.speed * dt)/300
+				if x > 1.1 then x = -0.1 end
+				if y > 1.1 then y = -0.1 end
+				m.s.Position = UDim2.fromScale(x, y)
+			end
+		end)
+	end
+
+	function IntroAnimation.createShootingStreaks(parent)
+		local streakRoot = Instance.new("Frame")
+		streakRoot.BackgroundTransparency = 1
+		streakRoot.Size = UDim2.fromScale(1,1)
+		streakRoot.ZIndex = 104
+		streakRoot.Parent = parent
+		task.spawn(function()
+			while streakRoot.Parent do
+				local st = Instance.new("Frame")
+				st.BackgroundColor3 = CYAN:Lerp(MAGENTA, math.random())
+				st.BackgroundTransparency = 0.15
+				st.Size = UDim2.fromOffset(math.random(120, 220), 2)
+				st.AnchorPoint = Vector2.new(0.5, 0.5)
+				local y = math.random()
+				st.Position = UDim2.fromScale(-0.1, y)
+				st.Rotation = -10 + math.random(-6, 6)
+				st.Parent = streakRoot
+				local g = Instance.new("UIGradient")
+				g.Color = ColorSequence.new{ColorSequenceKeypoint.new(0, WHITE), ColorSequenceKeypoint.new(0.3, WHITE), ColorSequenceKeypoint.new(1, WHITE)}
+				g.Transparency = NumberSequence.new{NumberSequenceKeypoint.new(0, 1), NumberSequenceKeypoint.new(0.15, 0.3), NumberSequenceKeypoint.new(0.85, 0.3), NumberSequenceKeypoint.new(1, 1)}
+				g.Parent = st
+				tween(st, TweenInfo.new(0.9, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {Position = UDim2.fromScale(1.2, y)}).Completed:Wait()
+				st:Destroy()
+				task.wait(math.random(12, 22)/100)
+			end
+		end)
+	end
+end
+
 function playStunningIntro()
 	local introGui = Instance.new("ScreenGui")
 	introGui.Name = "PT_Intro"
-	introGui.IgnoreGuiInset = true         -- fill the entire screen
+	introGui.IgnoreGuiInset = true
 	introGui.ResetOnSpawn = false
-	introGui.DisplayOrder = 1_000_000     -- absolutely on top
+	introGui.DisplayOrder = 1_000_000
 	introGui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
 	introGui.Parent = playerGui
 
-	-- Disable Roblox CoreGui so nothing sits above the intro
 	safeSetCoreAll(false)
 
-	-- Play one-time intro SFX
 	local sfx = Instance.new("Sound")
 	sfx.SoundId = "rbxassetid://7112183471"
 	sfx.Volume = 0.7
-	sfx.RollOffMode = Enum.RollOffMode.Linear -- 2D UI sound via SoundService
+	sfx.RollOffMode = Enum.RollOffMode.Linear
 	sfx.Parent = SoundService
 	sfx:Play()
 	sfx.Ended:Connect(function() sfx:Destroy() end)
 
-	local overlay = Instance.new("Frame")
-	overlay.Name = "CinematicOverlay"
-	overlay.BackgroundColor3 = BG
-	overlay.Size = UDim2.fromScale(1, 1)
-	overlay.ZIndex = 100
-	overlay.ClipsDescendants = true
-	overlay.Parent = introGui
+	local overlay = IntroAnimation.createOverlay(introGui)
+	IntroAnimation.createVignette(overlay)
+	local starConn = IntroAnimation.createParallaxStars(overlay)
+	IntroAnimation.createShootingStreaks(overlay)
 
-	-- Vignette
-	local vignette = Instance.new("Frame")
-	vignette.BackgroundTransparency = 1
-	vignette.Size = UDim2.fromScale(1, 1)
-	vignette.ZIndex = 102
-	vignette.Parent = overlay
-	local vigGrad = Instance.new("UIGradient")
-	vigGrad.Color = ColorSequence.new{
-		ColorSequenceKeypoint.new(0.00, Color3.fromRGB(30, 12, 45)),
-		ColorSequenceKeypoint.new(0.60, Color3.fromRGB(30, 12, 45)),
-		ColorSequenceKeypoint.new(1.00, Color3.fromRGB(15, 5, 25))
-	}
-	vigGrad.Rotation = 90
-	vigGrad.Parent = vignette
-
-	-- Parallax stars
-	local starRoot = Instance.new("Frame")
-	starRoot.BackgroundTransparency = 1
-	starRoot.Size = UDim2.fromScale(1,1)
-	starRoot.ZIndex = 103
-	starRoot.Parent = overlay
-
-	local layers = {
-		{count = 120, speed = 10,  size = Vector2.new(2,2), alpha = 0.45},
-		{count = 70,  speed = 25,  size = Vector2.new(3,3), alpha = 0.55},
-		{count = 28,  speed = 55,  size = Vector2.new(4,4), alpha = 0.70},
-	}
-	local movers = {}
-	local function makeStar(parent, sz, a)
-		local s = Instance.new("Frame")
-		s.BackgroundColor3 = WHITE
-		s.BackgroundTransparency = 1 - a
-		s.Size = UDim2.fromOffset(sz.X, sz.Y)
-		s.Position = UDim2.fromScale(math.random(), math.random())
-		s.ZIndex = 103
-		s.Parent = parent
-		local glow = Instance.new("Frame")
-		glow.AnchorPoint = Vector2.new(0.5, 0.5)
-		glow.Position = UDim2.fromScale(0.5, 0.5)
-		glow.Size = UDim2.fromOffset(sz.X*3, sz.Y*3)
-		glow.BackgroundColor3 = MAGENTA:Lerp(CYAN, math.random())
-		glow.BackgroundTransparency = 0.82
-		glow.Parent = s
-		corner(glow, math.max(sz.X, sz.Y))
-		corner(s, math.max(2, math.max(sz.X, sz.Y)))
-		return s
-	end
-	for _, l in ipairs(layers) do
-		for i=1, l.count do
-			local s = makeStar(starRoot, l.size, l.alpha)
-			table.insert(movers, {s = s, speed = l.speed})
-		end
-	end
-	local conn = RunService.RenderStepped:Connect(function(dt)
-		for _, m in ipairs(movers) do
-			local p = m.s.Position
-			local x = p.X.Scale + (m.speed * dt)/100
-			local y = p.Y.Scale + (m.speed * dt)/300
-			if x > 1.1 then x = -0.1 end
-			if y > 1.1 then y = -0.1 end
-			m.s.Position = UDim2.fromScale(x, y)
-		end
-	end)
-
-	-- Shooting streaks
-	local streakRoot = Instance.new("Frame")
-	streakRoot.BackgroundTransparency = 1
-	streakRoot.Size = UDim2.fromScale(1,1)
-	streakRoot.ZIndex = 104
-	streakRoot.Parent = overlay
-	local function spawnStreak()
-		local st = Instance.new("Frame")
-		st.BackgroundColor3 = CYAN:Lerp(MAGENTA, math.random())
-		st.BackgroundTransparency = 0.15
-		st.Size = UDim2.fromOffset(math.random(120, 220), 2)
-		st.AnchorPoint = Vector2.new(0.5, 0.5)
-		local y = math.random()
-		st.Position = UDim2.fromScale(-0.1, y)
-		st.Rotation = -10 + math.random(-6, 6)
-		st.Parent = streakRoot
-		local g = Instance.new("UIGradient")
-		g.Color = ColorSequence.new{
-			ColorSequenceKeypoint.new(0, WHITE),
-			ColorSequenceKeypoint.new(0.3, WHITE),
-			ColorSequenceKeypoint.new(1, WHITE)
-		}
-		g.Transparency = NumberSequence.new{
-			NumberSequenceKeypoint.new(0, 1),
-			NumberSequenceKeypoint.new(0.15, 0.3),
-			NumberSequenceKeypoint.new(0.85, 0.3),
-			NumberSequenceKeypoint.new(1, 1)
-		}
-		g.Parent = st
-		tween(st, TweenInfo.new(0.9, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {Position = UDim2.fromScale(1.2, y)}).Completed:Wait()
-		st:Destroy()
-	end
-	task.spawn(function()
-		while overlay.Parent do
-			spawnStreak()
-			task.wait(math.random(12, 22)/100)
-		end
-	end)
-
-	-- Splash image (rounded)
 	local splash = Instance.new("ImageLabel")
 	splash.Name = "SplashImage"
 	splash.BackgroundTransparency = 1
 	splash.AnchorPoint = Vector2.new(0.5, 0.5)
- 	splash.Position = UDim2.fromScale(0.5, 0.5)
+	splash.Position = UDim2.fromScale(0.5, 0.5)
 	splash.Size = UDim2.fromOffset(220, 140)
 	splash.Image = "rbxassetid://127277196439432"
 	splash.ScaleType = Enum.ScaleType.Fit
@@ -2622,21 +3205,17 @@ function playStunningIntro()
 	splash.Parent = overlay
 	corner(splash, 16)
 
-	-- Timings: expand 3.5s; shrink extended 2.0s; fade 1.0s
 	local EXPAND_TIME, SHRINK_TIME, FADE_TIME = 3.5, 2.0, 1.0
-
 	tween(splash, TweenInfo.new(EXPAND_TIME, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {Size = UDim2.fromScale(1,1)}).Completed:Wait()
 	tween(splash, TweenInfo.new(SHRINK_TIME, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {Size = UDim2.fromOffset(280,175)}).Completed:Wait()
 	tween(splash, TweenInfo.new(FADE_TIME), {ImageTransparency = 1}).Completed:Wait()
 
-	if conn then conn:Disconnect() end
+	if starConn then starConn:Disconnect() end
 	introGui:Destroy()
 	safeSetCoreAll(true)
 
-	-- Also call again right after your intro re-enables CoreGui:
 	disableBackpackPermanently()
 
-	-- Reveal the main GUI and arm the toggle
 	win.Visible = true
 	anim.homePos = win.Position
 	anim.isOpen = true
